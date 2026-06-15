@@ -334,7 +334,6 @@ useEffect(() => {
   // while PVLoop/ECGGraph received `activeParams` — causing the graphs to
   // show different values than the metric cards after preset changes.
   const infarct = activeInfarct   // alias for clarity below
-  const valve   = activeValve
 
   // FIX 3: Prefer live backend metrics → patient-specific metrics → bundled static
   const patientMetrics = currentPatient?.metrics ?? liveMetrics ?? baselineMetrics
