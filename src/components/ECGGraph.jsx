@@ -69,7 +69,6 @@ export default function ECGGraph({ heartRate = 75, beat, ef = 55, infarct = 0, m
   const [usingReal, setUsingReal] = useState(false)
 
   // Derived ECG interval stats — recompute whenever params change
-  const profile    = getProfile(ef, heartRate, infarct)
   const prInterval = Math.round(120 + (heartRate < 60 ? 60 : heartRate < 70 ? 40 : heartRate > 90 ? -10 : 20))
   const qrsWidth   = infarct > 50 ? 160 : infarct > 30 || ef < 40 ? 130 : ef < 50 ? 110 : 85
   const qtInterval = Math.round(420 - heartRate * 1.8)

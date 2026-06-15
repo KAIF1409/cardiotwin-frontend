@@ -1,5 +1,3 @@
-import { useState, useEffect } from 'react'
-
 const ACHIEVEMENTS = [
   {
     id: 'first_slider',

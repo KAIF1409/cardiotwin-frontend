@@ -70,8 +70,8 @@ export default function GuidedLearning({ onClose, onApplyStep }) {
   const [current, setCurrent] = useState(0)
   const step = STEPS[current]
   useEffect(() => {
-  onApplyStep?.(STEPS[0])
-}, [])
+    onApplyStep?.(STEPS[0])
+  }, [onApplyStep])
 
   const handleNext = () => {
     const next = Math.min(current + 1, STEPS.length - 1)

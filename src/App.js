@@ -59,7 +59,6 @@ import APIStatus from './components/APIStatus'
 import FlashcardDeck from './components/education/FlashcardDeck'
 import ECGQuiz from './components/education/ECGQuiz'
 import ClinicalCases from './components/education/ClinicalCases'
-import FilePicker from './components/FilePicker'
 import PatientSelector from './components/PatientSelector'
 import baselineMetrics from './data/internMetrics'
 import {
@@ -103,7 +102,6 @@ export default function App() {
   const [sweeping,        setSweeping]        = useState(false)
   const [sweepSpeed,      setSweepSpeed]      = useState(1)
   const [customModelURL,  setCustomModelURL]  = useState(null)
-  const [customModelName, setCustomModelName] = useState(null)
   const [currentPatient,  setCurrentPatient]  = useState(null)
 
   // FIX 3 — Live metrics from backend GET /metrics
@@ -318,18 +316,11 @@ useEffect(() => {
     }
   }
 
-  const handleFileLoaded = (url, name) => {
-    if (url) useGLTF.preload(url)
-    setCustomModelURL(url)
-    setCustomModelName(name)
-  }
-
   const handleSelectPatient = (patient) => {
     setCurrentPatient(patient)
     if (patient.meshPath) {
       useGLTF.preload(patient.meshPath)
       setCustomModelURL(patient.meshPath)
-      setCustomModelName(patient.label)
     }
   }
 
@@ -361,17 +352,9 @@ useEffect(() => {
     ?? Math.round(Math.max(10, Math.min(85,
         (patientMetrics.ef * (activeParams.Contractility / 60)) * (1 - infarct * 0.008)
        )))
-  // HR: preset Preload drives filling rate; infarct adds compensatory tachycardia
   const hr  = heartData?.hr  ?? Math.round(50 + activeParams.Preload * 0.5 + infarct * 0.25)
-  const co  = heartData?.co  ?? ((ef / 100) * hr * 0.08 * (valve / 100)).toFixed(1)
-  const sbp = heartData?.sbp ?? Math.round((60 + activeParams.Afterload * 0.9) * (valve / 100))
-  const dbp = heartData?.dbp ?? Math.round(60 + activeParams.Preload * 0.2)
-  // EDV/ESV: derived entirely from preset Preload/Afterload/Infarct, NOT anchored
-  // to patientMetrics baseline. DCM (Preload=85) → EDV~162ml; Normal (Preload=50) → EDV~120ml
   const edv = heartData?.edv ?? Math.round(60 + activeParams.Preload * 1.2 + infarct * 0.4)
   const esv = heartData?.esv ?? Math.round(20 + activeParams.Afterload * 0.6 + infarct * 0.5)
-
-  const baseScale = 0.8 + (activeParams.Contractility / 100) * 0.6 * (1 - infarct * 0.005)
   const beat      = useHeartbeat(hr)
   const handleBeat = useCallback(() => {}, [])
 
