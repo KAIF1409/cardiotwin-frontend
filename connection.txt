@@ -1,0 +1,156 @@
+═══════════════════════════════════════════════════════════
+  CardioTwin-X  —  How to Run (Frontend + Backend Together)
+═══════════════════════════════════════════════════════════
+
+FOLDER STRUCTURE EXPECTED
+──────────────────────────
+  your-project/
+  ├── CardioDigitalTwin/        ← backend (intern's folder)
+  │   ├── main.py
+  │   ├── requirements.txt
+  │   ├── api/
+  │   │   └── server.py
+  │   ├── core/
+  │   ├── gaussian/
+  │   └── data/
+  │
+  └── cardiotwin-frontend/      ← your React app
+      ├── src/
+      │   └── services/
+      │       └── apiService.js
+      └── package.json
+
+
+═══════════════════════════════
+  TERMINAL 1 — Start Backend
+═══════════════════════════════
+
+Step 1: Go into the backend folder
+  cd CardioDigitalTwin
+
+Step 2: Create virtual environment (only needed ONCE ever)
+  python -m venv env
+
+Step 3: Activate virtual environment
+  Windows:   env\Scripts\activate
+  Mac/Linux: source env/bin/activate
+
+  You will see (env) appear at the start of your terminal line.
+  This means it is active.
+
+Step 4: Install packages (only needed ONCE, or after requirements change)
+  pip install -r requirements.txt
+
+Step 5: Start the backend server
+  uvicorn main:app --reload
+
+  ✅ You should see:
+     INFO:     Uvicorn running on http://127.0.0.1:8000 (Press CTRL+C to quit)
+     INFO:     Application startup complete.
+
+Step 6: Test it is working — open browser and go to:
+  http://127.0.0.1:8000/
+  → Should show: {"status":"ok","message":"CardioTwin running"}
+
+  http://127.0.0.1:8000/docs
+  → Shows all API endpoints (Swagger UI)
+
+KEEP THIS TERMINAL OPEN.
+
+
+═════════════════════════════════
+  TERMINAL 2 — Start Frontend
+═════════════════════════════════
+
+Step 1: Open a NEW terminal (do not close Terminal 1)
+
+Step 2: Go into the frontend folder
+  cd cardiotwin-frontend
+
+Step 3: Install npm packages (only needed ONCE)
+  npm install
+
+Step 4: Start React app
+  npm start
+
+  ✅ You should see:
+     Compiled successfully!
+     Local: http://localhost:3000
+
+Step 5: Open browser → http://localhost:3000
+  → Header should show green dot "Backend Live"
+  → Canvas badge shows "⚡ Live Backend"
+  → Metrics panel shows "● LIVE" next to Metrics title
+
+
+═══════════════════════════
+  WHAT EACH ENDPOINT DOES
+═══════════════════════════
+
+  GET  /               → Health check (APIStatus.jsx polls this)
+  POST /start          → Starts heart simulation loop in background thread
+  POST /stop           → Stops simulation loop
+  GET  /state          → Returns latest volume, pressure, ecg, strain (HTTP fallback)
+  POST /params         → Receives disease preset from frontend (sendPresetToEngine)
+  GET  /simulate_cycle → Returns full 1-second cardiac cycle arrays for ECG + PV charts
+  GET  /metrics        → Returns patient MRI baseline (EF, EDV, ESV, wall thickness)
+  WS   /ws             → WebSocket — streams live data every 100ms (main data feed)
+
+
+═══════════════════════════
+  COMMON ERRORS & FIXES
+═══════════════════════════
+
+ERROR: "env\Scripts\activate is not recognized"
+  FIX: Make sure you are in the CardioDigitalTwin folder, not inside a subfolder.
+
+ERROR: "ModuleNotFoundError: No module named 'fastapi'"
+  FIX: Your virtual environment is not activated.
+       Run: env\Scripts\activate   (Windows)
+       Then: pip install -r requirements.txt
+
+ERROR: "Address already in use: port 8000"
+  FIX: Another process is using port 8000. Kill it:
+       Windows: netstat -ano | findstr :8000   → then taskkill /PID <number> /F
+       Mac/Linux: lsof -ti:8000 | xargs kill
+
+ERROR: Frontend shows "Backend Offline" (red dot)
+  FIX 1: Make sure backend is running (Terminal 1 shows Uvicorn line)
+  FIX 2: Make sure CORS is working — open http://127.0.0.1:8000/ in browser
+  FIX 3: Check apiService.js has: const API_BASE = 'http://127.0.0.1:8000'
+
+ERROR: "CORS error" in browser console
+  FIX: The main.py already has CORS middleware added. Make sure you are using
+       the updated main.py (not the old one without CORS).
+
+ERROR: WebSocket keeps disconnecting
+  FIX: This is normal if backend restarts. The frontend will automatically
+       reconnect up to 10 times with increasing delays. Just wait a few seconds.
+
+ERROR: "python main.py" starts but does nothing / crashes
+  FIX: Use uvicorn directly: uvicorn main:app --reload
+       Do NOT use: python main.py  (main.py has no __main__ block)
+
+
+═══════════════════════════
+  TEAM / NETWORK SETUP
+═══════════════════════════
+
+If Member 2 (backend) and Member 3 (frontend) are on DIFFERENT computers
+but SAME WiFi network:
+
+1. Member 2: Find their IP address
+   Windows: ipconfig  → look for IPv4 Address (e.g. 192.168.1.45)
+   Mac/Linux: ifconfig | grep inet
+
+2. Member 2: Start backend with:
+   uvicorn main:app --host 0.0.0.0 --reload
+
+3. Member 3: Edit src/services/apiService.js line 6:
+   const API_BASE = 'http://192.168.1.45:8000'   ← Member 2's IP
+   const WS_BASE  = 'ws://192.168.1.45:8000/ws'  ← same IP
+
+4. Also update main.py CORS to allow Member 3's machine:
+   allow_origins=["http://localhost:3000", "http://192.168.1.XX:3000"]
+
+═══════════════════════════════════════════════════════════

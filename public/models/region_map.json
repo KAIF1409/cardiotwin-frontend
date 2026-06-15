@@ -1,0 +1,9 @@
+{
+  "lv": { "label": "LV", "mesh": "LV.stl", "color": "#00bcd4", "description": "Left Ventricle" },
+  "rv": { "label": "RV", "mesh": "RV.stl", "color": "#ff9800", "description": "Right Ventricle" },
+  "myo": { "label": "MYO", "mesh": "MYO.stl", "color": "#ff6e6e", "description": "Myocardium" },
+  "aorta": { "label": "Aorta", "mesh": "full_heart.obj", "color": "#00e676", "description": "Aorta" },
+  "pa": { "label": "PA", "mesh": "full_heart.obj", "color": "#ffd740", "description": "Pulmonary Artery" },
+  "la": { "label": "LA", "mesh": "full_heart.obj", "color": "#ab47bc", "description": "Left Atrium" },
+  "ra": { "label": "RA", "mesh": "full_heart.obj", "color": "#ef5350", "description": "Right Atrium" }
+}

@@ -1,0 +1,42 @@
+{
+  "patient_info": {
+    "voxel_spacing_mm": [
+      1.2152800559997559,
+      1.2152800559997559,
+      5.0
+    ],
+    "voxel_volume_mm3": 7.3845
+  },
+  "cardiac_function": {
+    "EDV_mL": 85.1,
+    "ESV_mL": 34.1,
+    "SV_mL": 50.9,
+    "EF_pct": 59.9,
+    "EF_status": "Normal (55\u201370%)"
+  },
+  "lv_geometry": {
+    "ED_voxel_count": 11518,
+    "ES_voxel_count": 4624
+  },
+  "normal_ranges": {
+    "EF_normal_min": 55,
+    "EF_normal_max": 70,
+    "EDV_normal_range_mL": "80\u2013120",
+    "ESV_normal_range_mL": "30\u201350"
+  },
+  "valve_geometry": {
+    "annulus_center_mm": [
+      129.62209756452154,
+      186.0031610880612,
+      69.3607681040114
+    ],
+    "semi_major_axis_mm": 13.78,
+    "semi_minor_axis_mm": 10.54,
+    "annulus_area_mm2": 456.5,
+    "leaflet_height_mm": 4.0,
+    "z_threshold_mm": 67.45,
+    "method": "parametric_pca_sinusoidal",
+    "patent_claim": "Parametric valve reconstruction from ventricular geometry"
+  },
+  "wall_thickness_mm": 5.5
+}
