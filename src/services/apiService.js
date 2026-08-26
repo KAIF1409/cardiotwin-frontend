@@ -36,8 +36,10 @@
  */
 
 // ── Config ─────────────────────────────────────────────────────────────────
-const API_BASE = 'http://127.0.0.1:8000'
-const WS_BASE  = 'ws://127.0.0.1:8000/ws'
+import { pushLiveSample } from '../simulation/cardiacEngine'
+
+const API_BASE = process.env.REACT_APP_API_BASE || 'http://127.0.0.1:8000'
+const WS_BASE  = process.env.REACT_APP_WS_BASE  || 'ws://127.0.0.1:8000/ws'
 
 // ── Internal state ─────────────────────────────────────────────────────────
 let socket            = null
@@ -48,6 +50,9 @@ let wsConnected       = false
 let reconnectAttempts = 0
 let reconnectTimer    = null
 let httpPollTimer     = null
+let watchdogTimer     = null
+let manualStop        = false
+let lastSampleAt      = 0
 
 // ── Rolling buffers for EF / HR computation ────────────────────────────────
 const VOL_BUFFER_SIZE = 100
@@ -94,9 +99,33 @@ export function subscribeHeartData(callback) {
   return () => listeners.delete(callback)
 }
 
+// ── Connection status bus ──────────────────────────────────────────────────
+// 'connecting' | 'online_ws' | 'online_poll' | 'offline'
+let connectionState = 'connecting'
+const connListeners = new Set()
+
+function setConnState(s) {
+  if (connectionState === s) return
+  connectionState = s
+  connListeners.forEach(fn => { try { fn(s) } catch { /* noop */ } })
+}
+
+export function subscribeConnectionState(callback) {
+  connListeners.add(callback)
+  callback(connectionState)
+  return () => connListeners.delete(callback)
+}
+
+export function getConnectionState() { return connectionState }
+
 // ── State enrichment ────────────────────────────────────────────────────────
 
 function processAndNotify(raw) {
+  lastSampleAt = Date.now()
+  // Feed the master cardiac engine — it blends real samples into its
+  // locally-generated waveforms so every panel shares one truth.
+  pushLiveSample(raw)
+
   const volume   = raw?.volume   ?? null
   const pressure = raw?.pressure ?? null
   const ecg      = raw?.ecg      ?? null
@@ -142,23 +171,51 @@ function processAndNotify(raw) {
 }
 
 // ── WebSocket transport ────────────────────────────────────────────────────
+//
+// RESILIENCE MODEL (fixes the old "gives up after 10 attempts" bug):
+//   • Reconnect forever with exponential backoff + jitter (cap 10 s).
+//   • A watchdog runs every 3 s: if no fresh sample and no live socket,
+//     it health-probes GET / — the moment the backend answers, a WS
+//     reconnect fires immediately instead of waiting out the backoff.
+//   • HTTP /state polling is the data fallback while WS is down, so the
+//     dashboard keeps updating even mid-reconnect.
 
 function connectWebSocket() {
+  if (manualStop) return
   if (socket && (
     socket.readyState === WebSocket.OPEN ||
     socket.readyState === WebSocket.CONNECTING
   )) return
 
-  socket = new WebSocket(WS_BASE)
+  if (connectionState === 'offline' || connectionState === 'connecting') setConnState('connecting')
 
-  socket.onopen = () => {
+  let ws
+  try {
+    ws = new WebSocket(WS_BASE)
+  } catch (e) {
+    console.warn('⚠️ WS constructor failed:', e?.message)
+    scheduleReconnect()
+    return
+  }
+  socket = ws
+
+  // Safety timer — some environments never fire onerror/onclose.
+  const openTimeout = setTimeout(() => {
+    if (ws.readyState !== WebSocket.OPEN) {
+      try { ws.close() } catch { /* noop */ }
+    }
+  }, 5000)
+
+  ws.onopen = () => {
+    clearTimeout(openTimeout)
     wsConnected = true
     reconnectAttempts = 0
     stopHttpPoll()
+    setConnState('online_ws')
     console.log('✅ WebSocket connected to', WS_BASE)
   }
 
-  socket.onmessage = (event) => {
+  ws.onmessage = (event) => {
     try {
       const raw = JSON.parse(event.data)
       processAndNotify(raw)
@@ -167,27 +224,63 @@ function connectWebSocket() {
     }
   }
 
-  socket.onclose = () => {
+  ws.onclose = () => {
+    clearTimeout(openTimeout)
+    if (socket === ws) socket = null
+    if (!wsConnected && connectionState === 'connecting') {
+      // never opened — go to poll fallback immediately
+      startHttpPoll()
+    }
     wsConnected = false
-    console.warn('⚠️ WebSocket closed — starting HTTP fallback poll')
-    startHttpPoll()
-    attemptReconnect()
+    if (!manualStop) {
+      console.warn('⚠️ WebSocket closed — HTTP fallback active, reconnecting…')
+      startHttpPoll()
+      scheduleReconnect()
+    } else {
+      setConnState('offline')
+    }
   }
 
-  socket.onerror = () => {
-    console.warn('⚠️ WebSocket error')
-    socket?.close()
+  ws.onerror = () => {
+    clearTimeout(openTimeout)
+    try { ws.close() } catch { /* noop */ }
   }
 }
 
-function attemptReconnect() {
-  if (reconnectAttempts >= 10) {
-    console.warn('⚠️ WebSocket: max reconnect attempts reached')
-    return
-  }
+function scheduleReconnect() {
+  if (manualStop) return
+  if (reconnectTimer) return                       // one pending attempt at a time
   reconnectAttempts++
-  const delay = Math.min(1000 * reconnectAttempts, 5000)
-  reconnectTimer = setTimeout(connectWebSocket, delay)
+  // Exponential backoff 0.5s → 10s with ±30 % jitter — retries FOREVER.
+  const base = Math.min(500 * Math.pow(1.7, reconnectAttempts - 1), 10000)
+  const delay = Math.round(base * (0.7 + Math.random() * 0.6))
+  reconnectTimer = setTimeout(() => {
+    reconnectTimer = null
+    connectWebSocket()
+  }, delay)
+}
+
+// Watchdog — detects "backend came back online" fast, even after hours offline.
+function startWatchdog() {
+  if (watchdogTimer) return
+  watchdogTimer = setInterval(async () => {
+    if (manualStop) return
+    const stale = Date.now() - lastSampleAt > 3000
+    if (!stale) {                                  // data flowing — all good
+      if (!wsConnected && !httpPollTimer) connectWebSocket()
+      return
+    }
+    if (!wsConnected) {
+      // Probe health so recovery is instant when backend returns
+      const health = await checkAPIHealth()
+      if (health.status === 'ok') {
+        if (!reconnectTimer) scheduleReconnect()
+        if (!httpPollTimer) startHttpPoll()         // resume polling meanwhile
+      } else {
+        setConnState(httpPollTimer ? 'online_poll' : 'offline')
+      }
+    }
+  }, 3000)
 }
 
 // ── HTTP fallback polling ──────────────────────────────────────────────────
@@ -198,15 +291,17 @@ async function httpPollTick() {
     if (res.ok) {
       const raw = await res.json()
       processAndNotify(raw)
+      setConnState(wsConnected ? 'online_ws' : 'online_poll')
     }
   } catch {
-    // silent — WS reconnect will recover
+    setConnState(wsConnected ? 'online_ws' : 'offline')
   }
 }
 
 function startHttpPoll() {
-  if (httpPollTimer) return
+  if (httpPollTimer || manualStop) return
   httpPollTimer = setInterval(httpPollTick, 200)
+  httpPollTick()
 }
 
 function stopHttpPoll() {
@@ -221,6 +316,8 @@ function stopHttpPoll() {
 export async function startHeartEngine() {
   if (isStarted) return
   isStarted = true
+  manualStop = false
+  lastSampleAt = Date.now()
 
   try {
     await fetch(`${API_BASE}/start`, {
@@ -229,18 +326,23 @@ export async function startHeartEngine() {
     })
     console.log('✅ Heart engine started (/start)')
   } catch (e) {
-    console.warn('⚠️ /start failed:', e.message, '— attempting WS anyway')
+    console.warn('⚠️ /start failed:', e.message, '— backend offline, mock mode active')
   }
 
+  startWatchdog()
   connectWebSocket()
+  // Data fallback from the very first second (backend may be offline)
+  startHttpPoll()
 }
 
 export async function stopHeartEngine() {
+  manualStop = true
   try {
     await fetch(`${API_BASE}/stop`, { method: 'POST' })
   } catch { /* best-effort */ }
 
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
+  if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null }
   stopHttpPoll()
   socket?.close()
   socket            = null
@@ -251,6 +353,7 @@ export async function stopHeartEngine() {
   volBuffer         = []
   timeBuffer        = []
   lastBeatTime      = null
+  setConnState('offline')
 }
 
 /**

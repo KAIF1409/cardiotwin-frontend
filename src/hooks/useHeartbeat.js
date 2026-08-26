@@ -1,33 +1,51 @@
 /**
- * useHeartbeat.js
- * ===============
- * React hook — fires an incrementing counter at the given heart rate (BPM).
- * Used to drive pulsation animations in the 3-D heart model.
+ * useHeartbeat.js  —  v2 (MASTER CLOCK EDITION)
+ * =============================================
+ * Thin React wrapper over the singleton cardiac engine
+ * (src/simulation/cardiacEngine.js).
  *
- * Place this file at:  src/hooks/useHeartbeat.js
+ * The OLD version owned a setInterval that fired a counter — nothing else
+ * in the app could know *where* inside the cardiac cycle it was, so the
+ * 3D mesh, ECG, PV loop and strain gauges each ran their own drifting
+ * timers.  This version delegates all timing to the engine:
  *
- * @param {number} heartRate  — beats per minute (clamped 30–200)
- * @returns {number}          — beat counter (increments once per beat)
+ *   • `phase` — continuous 0→1 position in the current cardiac cycle.
+ *   • `beat`  — monotonically increasing beat counter (same contract as v1,
+ *               so existing consumers keep working).
+ *
+ * Components that need per-frame data should NOT re-render through this
+ * hook — they should register with onEngineFrame() instead.  This hook is
+ * for lightweight UI (badges, meters).
  */
 
-import { useEffect, useRef, useState } from 'react'
+import { useEffect, useState } from 'react'
+import {
+  subscribeEngineState,
+  setEngineParams,
+} from '../simulation/cardiacEngine'
 
 export default function useHeartbeat(heartRate) {
-  const [beat, setBeat] = useState(0)
-  const intervalRef = useRef(null)
+  const [{ beat, phase }, setTick] = useState({ beat: 0, phase: 0 })
 
   useEffect(() => {
-    if (intervalRef.current) clearInterval(intervalRef.current)
-
-    const bpm = Math.max(30, Math.min(200, heartRate || 75))
-    const intervalMs = (60 / bpm) * 1000
-
-    intervalRef.current = setInterval(() => {
-      setBeat(b => b + 1)
-    }, intervalMs)
-
-    return () => clearInterval(intervalRef.current)
+    if (heartRate != null) {
+      setEngineParams({ heartRate: Math.max(30, Math.min(200, heartRate || 75)) })
+    }
   }, [heartRate])
 
+  useEffect(() => {
+    // ≈8 Hz is plenty for a numeric readout / flash trigger
+    return subscribeEngineState(s => setTick({ beat: s.beatIndex, phase: s.phase }), 8)
+  }, [])
+
   return beat
+}
+
+/**
+ * Convenience: subscribe to throttled full engine snapshots for React state.
+ */
+export function useCardiacSnapshot(hz = 8) {
+  const [snap, setSnap] = useState(null)
+  useEffect(() => subscribeEngineState(setSnap, hz), [hz])
+  return snap
 }

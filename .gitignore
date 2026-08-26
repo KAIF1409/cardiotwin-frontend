@@ -21,3 +21,7 @@
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# local duplicate + python venv (never commit)
+/cardiotwin-backend
+/cardiotwin-frontend
