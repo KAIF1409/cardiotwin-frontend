@@ -17,6 +17,7 @@ const STEPS = [
   { id: 'LV', icon: '🔴', name: 'Left Ventricle (LV)', text: 'The strongest chamber! Its thick wall pumps red blood all the way to your toes through the aorta.', focus: 'LV' },
   { id: 'IVS', icon: '🧱', name: 'Septum (IVS)', text: 'The muscular wall dividing left from right. It keeps oxygen-rich and oxygen-poor blood completely separate — that is DOUBLE circulation.', focus: 'IVS' },
   { id: 'MYO', icon: '💪', name: 'Myocardium', text: 'The heart muscle itself. Like any muscle it needs its own blood supply — the coronary arteries.', focus: 'MYO' },
+  { id: 'pericardium', icon: '🛡️', name: 'Pericardium', text: 'A tough double-walled sac that surrounds and protects the whole heart. Lubricating fluid between its layers lets the heart beat smoothly without friction. Inflammation of this sac is called pericarditis.', focus: null },
 ]
 
 export default function AnatomyTour({ onHeartSync }) {
