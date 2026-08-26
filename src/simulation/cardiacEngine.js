@@ -363,13 +363,22 @@ export function setCirculationMode(mode) {
 
 export function setConductionOverlay(on) { conductionOverlay = !!on }
 
-/** apiService pushes live backend samples here. */
+/** apiService pushes live backend samples here (sanitised). */
 export function pushLiveSample(raw = {}) {
   live.active = true
   live.lastAt = Date.now()
-  if (raw.ecg      !== undefined && raw.ecg      !== null) live.ecg      = parseFloat(raw.ecg)
-  if (raw.volume   !== undefined && raw.volume   !== null) live.volume   = parseFloat(raw.volume)
-  if (raw.pressure !== undefined && raw.pressure !== null) live.pressure = parseFloat(raw.pressure)
+  const num = v => {
+    const n = typeof v === 'string' ? parseFloat(v) : v
+    return Number.isFinite(n) ? n : null
+  }
+  // Strict physiological envelopes — corrupt backend telemetry must never
+  // reach the waveforms (mirror of the StrainPanel emergency clamps).
+  const ecg      = num(raw.ecg)
+  const volume   = num(raw.volume)
+  const pressure = num(raw.pressure)
+  if (ecg      !== null && ecg      > -3   && ecg      < 3)   live.ecg      = ecg
+  if (volume   !== null && volume   >= 10  && volume   <= 400) live.volume   = volume
+  if (pressure !== null && pressure  >= 0   && pressure <= 300) live.pressure = pressure
   if (raw.strainRegions) live.strainRegions = raw.strainRegions
 }
 

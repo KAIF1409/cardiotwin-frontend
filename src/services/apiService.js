@@ -38,8 +38,29 @@
 // ── Config ─────────────────────────────────────────────────────────────────
 import { pushLiveSample } from '../simulation/cardiacEngine'
 
-const API_BASE = process.env.REACT_APP_API_BASE || 'http://127.0.0.1:8000'
-const WS_BASE  = process.env.REACT_APP_WS_BASE  || 'ws://127.0.0.1:8000/ws'
+// Environment-aware endpoints. Works with EITHER variable naming:
+//   REACT_APP_API_URL / REACT_APP_WS_URL   (preferred)
+//   REACT_APP_API_BASE / REACT_APP_WS_BASE (legacy)
+// On Vercel (no backend running) leave these unset — the app falls back
+// to a clean local physics simulation without hammering a dead host.
+const API_BASE = process.env.REACT_APP_API_URL  ||
+                 process.env.REACT_APP_API_BASE ||
+                 'http://127.0.0.1:8000'
+const WS_BASE  = process.env.REACT_APP_WS_URL   ||
+                 process.env.REACT_APP_WS_BASE  ||
+                 'ws://127.0.0.1:8000/ws'
+
+const IS_PROD = process.env.NODE_ENV === 'production'
+
+// Console discipline: in production only the FIRST occurrence of each
+// warning is printed; dev keeps full verbosity.
+const __warned = new Set()
+function warnOnce(key, ...args) {
+  if (!IS_PROD) { console.warn(...args); return }
+  if (__warned.has(key)) return
+  __warned.add(key)
+  console.warn(...args)
+}
 
 // ── Internal state ─────────────────────────────────────────────────────────
 let socket            = null
@@ -51,8 +72,16 @@ let reconnectAttempts = 0
 let reconnectTimer    = null
 let httpPollTimer     = null
 let watchdogTimer     = null
+let offlineProbeTimer = null
+let offlineBackoffIx  = 0
+let pollFailures      = 0
 let manualStop        = false
 let lastSampleAt      = 0
+
+// Escalating retry ladder once the backend is confirmed unreachable.
+// 4s → 8s → 16s → 30s → 60s (cap). Keeps the console clean on Vercel
+// while still re-attaching within a minute of the backend appearing.
+const OFFLINE_PROBE_STEPS = [4000, 8000, 16000, 30000, 60000]
 
 // ── Rolling buffers for EF / HR computation ────────────────────────────────
 const VOL_BUFFER_SIZE = 100
@@ -193,8 +222,8 @@ function connectWebSocket() {
   try {
     ws = new WebSocket(WS_BASE)
   } catch (e) {
-    console.warn('⚠️ WS constructor failed:', e?.message)
-    scheduleReconnect()
+    warnOnce('ws-ctor', '⚠️ WS constructor failed:', e?.message)
+    enterOfflineMode()
     return
   }
   socket = ws
@@ -210,7 +239,10 @@ function connectWebSocket() {
     clearTimeout(openTimeout)
     wsConnected = true
     reconnectAttempts = 0
+    offlineBackoffIx = 0
+    pollFailures = 0
     stopHttpPoll()
+    clearOfflineProbe()
     setConnState('online_ws')
     console.log('✅ WebSocket connected to', WS_BASE)
   }
@@ -220,25 +252,19 @@ function connectWebSocket() {
       const raw = JSON.parse(event.data)
       processAndNotify(raw)
     } catch (e) {
-      console.warn('⚠️ WS parse error:', e)
+      warnOnce('ws-parse', '⚠️ WS parse error:', e)
     }
   }
 
   ws.onclose = () => {
     clearTimeout(openTimeout)
     if (socket === ws) socket = null
-    if (!wsConnected && connectionState === 'connecting') {
-      // never opened — go to poll fallback immediately
-      startHttpPoll()
-    }
     wsConnected = false
-    if (!manualStop) {
-      console.warn('⚠️ WebSocket closed — HTTP fallback active, reconnecting…')
-      startHttpPoll()
-      scheduleReconnect()
-    } else {
-      setConnState('offline')
-    }
+    if (manualStop) { setConnState('offline'); return }
+
+    warnOnce('ws-closed', '⚠️ WebSocket closed — falling back to local simulation until backend returns')
+    startHttpPoll()
+    scheduleReconnect()
   }
 
   ws.onerror = () => {
@@ -251,7 +277,10 @@ function scheduleReconnect() {
   if (manualStop) return
   if (reconnectTimer) return                       // one pending attempt at a time
   reconnectAttempts++
-  // Exponential backoff 0.5s → 10s with ±30 % jitter — retries FOREVER.
+  // In production, give up direct WS retries after 3 tries and switch to
+  // the slow offline-probe ladder (stops ws://127.0.0.1 console spam).
+  if (IS_PROD && reconnectAttempts > 3) { enterOfflineMode(); return }
+  // Exponential backoff 0.5s → 10s with ±30 % jitter.
   const base = Math.min(500 * Math.pow(1.7, reconnectAttempts - 1), 10000)
   const delay = Math.round(base * (0.7 + Math.random() * 0.6))
   reconnectTimer = setTimeout(() => {
@@ -260,25 +289,58 @@ function scheduleReconnect() {
   }, delay)
 }
 
-// Watchdog — detects "backend came back online" fast, even after hours offline.
+// ── Offline mode: quiet, escalating re-probe ───────────────────────────────
+// Confirmed-unreachable backend → stop the 200 ms poll flood, park the
+// connection, and re-probe on an escalating ladder. Instant recovery is
+// also triggered by browser 'online' / tab-focus events.
+
+function enterOfflineMode() {
+  stopHttpPoll()
+  if (connectionState !== 'offline') setConnState('offline')
+  scheduleOfflineProbe()
+}
+
+function clearOfflineProbe() {
+  if (offlineProbeTimer) { clearTimeout(offlineProbeTimer); offlineProbeTimer = null }
+}
+
+function scheduleOfflineProbe() {
+  if (manualStop || offlineProbeTimer) return
+  const delay = OFFLINE_PROBE_STEPS[Math.min(offlineBackoffIx, OFFLINE_PROBE_STEPS.length - 1)]
+  offlineProbeTimer = setTimeout(probeBackendNow, delay)
+}
+
+async function probeBackendNow() {
+  offlineProbeTimer = null
+  if (manualStop) return
+  const health = await checkAPIHealth()
+  if (health.status === 'ok') {
+    offlineBackoffIx = 0
+    pollFailures = 0
+    reconnectAttempts = 0
+    console.log('✅ Backend reachable again — resuming live stream')
+    connectWebSocket()
+    startHttpPoll()
+  } else {
+    offlineBackoffIx++
+    scheduleOfflineProbe()
+  }
+}
+
+// Watchdog — maintenance while ONLINE only (offline recovery is owned by
+// the probe ladder above, so no health request is fired while parked).
 function startWatchdog() {
   if (watchdogTimer) return
-  watchdogTimer = setInterval(async () => {
-    if (manualStop) return
+  watchdogTimer = setInterval(() => {
+    if (manualStop || connectionState === 'offline') return
     const stale = Date.now() - lastSampleAt > 3000
     if (!stale) {                                  // data flowing — all good
       if (!wsConnected && !httpPollTimer) connectWebSocket()
       return
     }
-    if (!wsConnected) {
-      // Probe health so recovery is instant when backend returns
-      const health = await checkAPIHealth()
-      if (health.status === 'ok') {
-        if (!reconnectTimer) scheduleReconnect()
-        if (!httpPollTimer) startHttpPoll()         // resume polling meanwhile
-      } else {
-        setConnState(httpPollTimer ? 'online_poll' : 'offline')
-      }
+    if (!wsConnected && !httpPollTimer) {
+      // silent drop — restart the poll stream, WS stays on its own backoff
+      startHttpPoll()
     }
   }, 3000)
 }
@@ -289,13 +351,30 @@ async function httpPollTick() {
   try {
     const res = await fetch(`${API_BASE}/state`, { signal: AbortSignal.timeout(2000) })
     if (res.ok) {
+      pollFailures = 0
       const raw = await res.json()
       processAndNotify(raw)
       setConnState(wsConnected ? 'online_ws' : 'online_poll')
+    } else {
+      pollFailure()
     }
   } catch {
-    setConnState(wsConnected ? 'online_ws' : 'offline')
+    pollFailure()
   }
+}
+
+function pollFailure() {
+  pollFailures++
+  // Production: after a few refusals stop the request flood entirely and
+  // park on the slow offline-probe ladder (kills ERR_CONNECTION_REFUSED
+  // console spam on Vercel). Dev keeps polling so the backend is picked
+  // up the moment it starts.
+  if (IS_PROD && pollFailures >= 4 && connectionState !== 'offline') {
+    warnOnce('offline', '⚠️ Backend unreachable — switching to local simulation (auto-reconnect every 30–60 s)')
+    enterOfflineMode()
+    return
+  }
+  setConnState(wsConnected ? 'online_ws' : connectionState === 'offline' ? 'offline' : 'connecting')
 }
 
 function startHttpPoll() {
@@ -326,7 +405,16 @@ export async function startHeartEngine() {
     })
     console.log('✅ Heart engine started (/start)')
   } catch (e) {
-    console.warn('⚠️ /start failed:', e.message, '— backend offline, mock mode active')
+    warnOnce('start', '⚠️ /start unreachable — local physics simulation active')
+  }
+
+  // Instant recovery when the network/tab comes back — no waiting out
+  // the backoff ladder.
+  if (typeof window !== 'undefined') {
+    window.addEventListener('online', () => probeBackendNow())
+    document.addEventListener('visibilitychange', () => {
+      if (!document.hidden && connectionState === 'offline') probeBackendNow()
+    })
   }
 
   startWatchdog()
@@ -343,6 +431,7 @@ export async function stopHeartEngine() {
 
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
   if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null }
+  clearOfflineProbe()
   stopHttpPoll()
   socket?.close()
   socket            = null

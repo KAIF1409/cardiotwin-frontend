@@ -19,6 +19,33 @@ const NORMAL_REF = { Global: -22.0, LV: -20.5, RV: -26.0, LA: -32.0, RA: -29.5 }
 const INFARCT_SENSITIVITY = { Global: 0.12, LV: 0.18, RV: 0.09, LA: 0.05, RA: 0.04 }
 const MAX_ABS = 35
 
+// Physiological display bounds (GLS family) — the emergency clamp that
+// killed the "-2558.7% GLS" bug. Live backend values can arrive as raw
+// fractions (-0.22) OR already-scaled percents (-22) OR corrupted junk;
+// every path is normalised then hard-clamped.
+const CLAMP = {
+  Global: [-25.0, -15.0],
+  LV:     [-25.0, -15.0],
+  RV:     [-25.0, -15.0],
+  LA:     [-35.0, -15.0],
+  RA:     [-33.0, -15.0],
+}
+
+/**
+ * Convert any incoming strain representation to a sane percentage.
+ *  -0.22   → -22        (fraction → %)
+ *  -22     → -22        (already %)
+ *  -2558.7 → -25        (corrupted → clamped to chamber bound)
+ *  NaN     → null       (caller uses the offline baseline)
+ */
+function normalizeStrainPct(raw, key) {
+  const v = typeof raw === 'string' ? parseFloat(raw) : raw
+  if (v == null || !Number.isFinite(v)) return null
+  const pct = v > -1.5 && v < 1.5 ? v * 100 : v      // fraction → percent
+  const [lo, hi] = CLAMP[key] || [-35, -15]
+  return Math.max(lo, Math.min(hi, pct))             // STRICT bound check
+}
+
 const toneFor = val => {
   const abs = Math.abs(val)
   if (abs >= 18) return 'good'     // emerald
@@ -33,17 +60,17 @@ export default function StrainPanel({ infarct = 0 }) {
   const [instant, setInstant]         = useState(null)   // instantaneous engine strain %
   const barRefs = useRef({})
 
-  // live backend override
+  // live backend override — normalised + clamped at the door
   useEffect(() => (
     subscribeHeartData(data => {
       if (!data?.strainRegions) return
       const sr = data.strainRegions
       setLiveStrain({
-        Global: parseFloat((sr.global ?? sr.Global ?? -0.22).toFixed(3)),
-        LV:     parseFloat((sr.LV     ?? sr.lv     ?? -0.205).toFixed(3)),
-        RV:     parseFloat((sr.RV     ?? sr.rv     ?? -0.26 ).toFixed(3)),
-        LA:     parseFloat((sr.LA     ?? sr.la     ?? -0.32 ).toFixed(3)),
-        RA:     parseFloat((sr.RA     ?? sr.ra     ?? -0.295).toFixed(3)),
+        Global: normalizeStrainPct(sr.global ?? sr.Global, 'Global'),
+        LV:     normalizeStrainPct(sr.LV     ?? sr.lv,     'LV'),
+        RV:     normalizeStrainPct(sr.RV     ?? sr.rv,     'RV'),
+        LA:     normalizeStrainPct(sr.LA     ?? sr.la,     'LA'),
+        RA:     normalizeStrainPct(sr.RA     ?? sr.ra,     'RA'),
       })
       setIsLive(true)
     })
@@ -73,19 +100,25 @@ export default function StrainPanel({ infarct = 0 }) {
     })
   }, [])
 
-  // displayed peaks: live backend > infarct-adjusted baseline
+  // displayed peaks: live backend (clamped) > infarct-adjusted baseline
+  // (baseline itself is clamped so the offline fallback can NEVER escape
+  // physiological bounds either)
   const peaks = {}
   Object.keys(NORMAL_REF).forEach(k => {
-    if (liveStrain && liveStrain[k] != null && !Number.isNaN(liveStrain[k])) {
-      peaks[k] = Math.min(-0.5, liveStrain[k] * 100)
+    const live = liveStrain ? liveStrain[k] : null
+    if (live != null && !Number.isNaN(live)) {
+      peaks[k] = live
     } else {
-      peaks[k] = Math.min(-0.5, NORMAL_REF[k] + infarct * INFARCT_SENSITIVITY[k])
+      const raw = NORMAL_REF[k] + infarct * INFARCT_SENSITIVITY[k]
+      const [lo, hi] = CLAMP[k]
+      peaks[k] = Math.max(lo, Math.min(hi, raw))
     }
   })
 
   const currentVal = k => {
     if (instant && instant[k] !== undefined && Math.abs(instant[k]) > 0.4) {
-      return parseFloat(instant[k].toFixed(1))
+      const [lo, hi] = CLAMP[k] || [-35, -15]
+      return parseFloat(Math.max(lo, Math.min(hi, instant[k])).toFixed(1))
     }
     return peaks[k]
   }
