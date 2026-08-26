@@ -40,6 +40,7 @@ import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { subscribeHeartData } from '../services/apiService'
+import { onEngineFrame } from '../simulation/cardiacEngine'
 
 // ─────────────────────────────────────────────
 // HEATMAP COLORS  (strain → colour)
@@ -80,24 +81,30 @@ const REGION_STRAIN_KEY = {
 // FALLBACK HEART (sphere)
 // ─────────────────────────────────────────────
 
-function FallbackHeart({ baseScale, heartRate }) {
-  const ref     = useRef()
-  const timeRef = useRef(0)
+function FallbackHeart({ baseScale }) {
+  const ref = useRef()
+
+  useEffect(() => {
+    return onEngineFrame((s) => {
+      if (!ref.current) return
+      const k    = Math.max(s.contractLV, s.contractRV)
+      const pulse = baseScale * (1 - 0.16 * k)
+      ref.current.scale.setScalar(pulse * 1.5)
+    })
+  }, [baseScale])
 
   useFrame((_, delta) => {
-    if (!ref.current) return
-    timeRef.current += delta
-    const bps   = heartRate / 60
-    const beat  = Math.sin(timeRef.current * bps * Math.PI * 2)
-    const pulse = baseScale + (beat > 0.8 ? (beat - 0.8) * 0.25 : 0)
-    ref.current.scale.setScalar(pulse * 1.5)
-    ref.current.rotation.y += delta * 0.08
+    if (ref.current) ref.current.rotation.y += delta * 0.08
   })
 
   return (
     <mesh ref={ref}>
       <sphereGeometry args={[1, 64, 64]} />
-      <meshStandardMaterial color="#ef5350" roughness={0.4} metalness={0.1} />
+      <meshPhysicalMaterial
+        color="#ef5350" roughness={0.42} metalness={0.02}
+        clearcoat={0.5} clearcoatRoughness={0.4}
+        emissive="#3a0d0b" emissiveIntensity={0.25}
+      />
     </mesh>
   )
 }
@@ -125,7 +132,6 @@ function FallbackHeart({ baseScale, heartRate }) {
  */
 function AnimatedHeart({ scene, baseScale, heartRate, infarct, strainRegions, regionMap }) {
   const groupRef         = useRef()
-  const timeRef          = useRef(0)
   const originalColors   = useRef([])
   const meshListRef      = useRef([])   // [{mesh, regionKey}]
   const initializedRef   = useRef(false)
@@ -178,13 +184,23 @@ function AnimatedHeart({ scene, baseScale, heartRate, infarct, strainRegions, re
 
     meshListRef.current = meshList
 
-    // Clone materials once so we can mutate colour per-region
+    // Clone materials once so we can mutate colour per-region (PBR tissue)
     if (!initializedRef.current) {
       originalColors.current = meshList.map(({ mesh }) => {
         if (!mesh.material) return null
-        mesh.material             = mesh.material.clone()
-        mesh.material.roughness   = 0.4
-        mesh.material.metalness   = 0.1
+        mesh.material                    = mesh.material.clone()
+        mesh.material.roughness          = 0.45
+        mesh.material.metalness          = 0.02
+        if ('clearcoat' in mesh.material) {
+          mesh.material.clearcoat            = 0.5
+          mesh.material.clearcoatRoughness   = 0.35
+          mesh.material.sheen                = 0.55
+          if (mesh.material.sheenColor) mesh.material.sheenColor.set('#ff8a7a')
+          if (mesh.material.emissive) {
+            mesh.material.emissive.set('#3a0d0b')
+            mesh.material.emissiveIntensity = 0.22
+          }
+        }
         return mesh.material.color ? mesh.material.color.clone() : null
       })
       initializedRef.current = true
@@ -227,60 +243,66 @@ function AnimatedHeart({ scene, baseScale, heartRate, infarct, strainRegions, re
   }
 
   // ─────────────────────────────────────────────────────────────────────────
-  // useFrame — per-frame heartbeat animation with per-region strain scaling
+  // MASTER-CLOCK animation — per-region strain scaling
   // ─────────────────────────────────────────────────────────────────────────
-  useFrame((_, delta) => {
-    if (!groupRef.current) return
+  // v1 ran a private sine clock (drifted vs ECG) and re-ran
+  // applyHeatmapColors() EVERY FRAME (~60 colour writes/s — wasteful).
+  // Now: contraction reads engine contractLV/RV; heatmap colours update
+  // ONLY when strain/infarct actually change.
+  const heatKeyRef = useRef('')
 
-    timeRef.current += delta
+  useEffect(() => {
+    const unsub = onEngineFrame((s) => {
+      if (!groupRef.current) return
 
-    const bps       = heartRate / 60
-    const beatPhase = Math.sin(timeRef.current * bps * Math.PI * 2)
-    const isPeak    = beatPhase > 0.8
+      const strain = liveStrainRef.current
 
-    const strain = liveStrainRef.current
+      if (strain && meshListRef.current.length > 0) {
+        // ── Per-region deformation ─────────────────────────────────────
+        // Each mesh contracts by its own strain amount. Engine gives the
+        // mechanical shortening fraction for THIS instant (s.contractLV),
+        // so peak contraction lands exactly on the ECG QRS peak.
+        const CONTRACTION_GAIN = 0.75
 
-    if (strain && meshListRef.current.length > 0) {
-      // ── Per-region deformation ─────────────────────────────────────────
-      // Each mesh contracts by its own strain amount.
-      // Strain is negative (e.g. -0.185) → abs gives contraction magnitude.
-      // contractionGain converts to visible scale change (tuned for 3D legibility).
-      const CONTRACTION_GAIN = 0.15
+        meshListRef.current.forEach(({ mesh, regionKey }) => {
+          const strainField = REGION_STRAIN_KEY[regionKey] || 'global'
+          const rawStrain   = Math.abs(strain[strainField] ?? strain.global ?? -0.20)
+          const healthy     = Math.abs(strain.global ?? -0.20)
+          // viability: how close this region's strain is to global healthy
+          const viability   = healthy > 0 ? rawStrain / healthy : 0
 
-      meshListRef.current.forEach(({ mesh, regionKey }) => {
-        const strainField = REGION_STRAIN_KEY[regionKey] || 'global'
-        const rawStrain   = strain[strainField] ?? strain.global ?? -0.20
-        const absStrain   = Math.abs(rawStrain)
+          const regionalK = s.contractLV * viability * CONTRACTION_GAIN / 0.75
+          const meshScale = baseScale * (1 - 0.14 * regionalK)
 
-        // Healthy tissue: absStrain ~0.20 → full contraction
-        // Infarcted:      absStrain ~0.01 → barely moves
-        const contractionMagnitude = absStrain * CONTRACTION_GAIN
+          mesh.scale.setScalar(Math.max(0.5, meshScale))
+        })
 
-        const meshScale = isPeak
-          ? baseScale * (1 - contractionMagnitude * (beatPhase - 0.8) * 5)
-          : baseScale
+        groupRef.current.rotation.y += 0.0013   // slow turn, frame-rate independent enough
 
-        mesh.scale.setScalar(Math.max(0.5, meshScale))
-      })
+        // heatmap refresh only on change
+        const key = `${infarct}|${strain.LV ?? ''}|${strain.RV ?? ''}|${strain.global ?? ''}`
+        if (key !== heatKeyRef.current) {
+          heatKeyRef.current = key
+          applyHeatmapColors(meshListRef.current, strain, infarct)
+        }
+      } else {
+        // ── Fallback: uniform scale driven by infarct slider ────────────
+        const k             = Math.max(s.contractLV, s.contractRV)
+        const strainFactor  = 1 - infarct * 0.005
+        groupRef.current.scale.setScalar(baseScale * (1 - 0.15 * k * strainFactor) * 2)
+        groupRef.current.rotation.y += 0.0013
 
-      // Slow group rotation
-      groupRef.current.scale.setScalar(2)
-      groupRef.current.rotation.y += delta * 0.08
+        const key = `u|${infarct}`
+        if (key !== heatKeyRef.current) {
+          heatKeyRef.current = key
+          applyHeatmapColors(meshListRef.current, null, infarct)
+        }
+      }
+    })
+    return unsub
+  }, [baseScale, infarct])
 
-      // Update heatmap colours live
-      applyHeatmapColors(meshListRef.current, strain, infarct)
-
-    } else {
-      // ── Fallback: uniform scale driven by infarct slider ──────────────
-      const strainFactor    = 1 - infarct * 0.005
-      const pulseMagnitude  = isPeak ? (beatPhase - 0.8) * 0.3 * strainFactor : 0
-      const uniformScale    = baseScale + pulseMagnitude
-      groupRef.current.scale.setScalar(uniformScale * 2)
-      groupRef.current.rotation.y += delta * 0.08
-    }
-  })
-
-  return (
+      return (
     <group ref={groupRef}>
       <primitive object={scene} />
     </group>

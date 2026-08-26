@@ -6,12 +6,14 @@ import React, {
   Component,
 } from 'react'
 
-import { useFrame, useLoader } from '@react-three/fiber'
+import { useLoader } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 
 import { STLLoader } from 'three/examples/jsm/loaders/STLLoader'
 
 import * as THREE from 'three'
+
+import { onEngineFrame } from '../simulation/cardiacEngine'
 
 // ─────────────────────────────────────────────
 // CHAMBER CONFIG
@@ -536,7 +538,7 @@ function SmartChamber(props) {
 export default function ChamberHeart({
   baseScale = 1,
 
-  heartRate = 72,
+  heartRate = 72,   // kept for API compat — the master engine owns timing
 
   onSelectChamber,
 
@@ -544,28 +546,24 @@ export default function ChamberHeart({
 
   infarct = 0,
 }) {
-  const timeRef = useRef(0)
+  // ── MASTER CLOCK FIX ──────────────────────────────────────────────
+  // v1 mutated a ref inside useFrame and passed `beatScale.current` as a
+  // PROP. Ref mutations never re-render React, so every chamber received
+  // a frozen value and nothing ever pulsed. Now one <group> wraps all
+  // chambers and ITS transform is driven imperatively each frame from the
+  // master cardiac engine — same clock as ECG/PV/strain, zero re-renders.
+  const pulseRef = useRef()
 
-  const beatScale = useRef(1)
-
-  useFrame((_, delta) => {
-    timeRef.current += delta
-
-    const bps = heartRate / 60
-
-    const beat = Math.sin(
-      timeRef.current *
-        bps *
-        Math.PI *
-        2
-    )
-
-    beatScale.current =
-      1 +
-      (beat > 0.8
-        ? (beat - 0.8) * 0.22
-        : 0)
-  })
+  useEffect(() => {
+    return onEngineFrame(s => {
+      if (!pulseRef.current) return
+      // ventricles dominate systolic squeeze; atria kick adds a small pre-beat
+      const k = Math.max(s.contractLV, s.contractRV)
+      const kick = s.contractLA * 0.35
+      const pulse = baseScale * (1 - 0.16 * k - 0.05 * kick)
+      pulseRef.current.scale.setScalar(pulse)
+    })
+  }, [baseScale])
 
   const handleSelect = (id) => {
     if (!onSelectChamber) return
@@ -579,6 +577,7 @@ export default function ChamberHeart({
 
   return (
     <group
+      ref={pulseRef}
       position={[0, -0.15, 0]}
       rotation={[0.1, Math.PI, 0]}
     >
@@ -594,9 +593,7 @@ export default function ChamberHeart({
             selectedChamber !== null
           }
           baseScale={baseScale}
-          beatScale={
-            beatScale.current
-          }
+          beatScale={1}
           onSelect={handleSelect}
           infarct={infarct}
         />

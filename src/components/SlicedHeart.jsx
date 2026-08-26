@@ -1,7 +1,9 @@
 import { useRef, useEffect, useMemo } from 'react'
 import { useGLTF } from '@react-three/drei'
-import { useFrame, useThree } from '@react-three/fiber'
+import { useThree } from '@react-three/fiber'
 import * as THREE from 'three'
+
+import { onEngineFrame } from '../simulation/cardiacEngine'
 
 // Shared clipping plane
 const PLANE = new THREE.Plane(new THREE.Vector3(0, -1, 0), 0)
@@ -24,7 +26,6 @@ export default function SlicedHeart({
   const sceneB = useMemo(() => originalScene.clone(true), [originalScene])
 
   const groupRef = useRef()
-  const timeRef = useRef(0)
   const sweepRef = useRef(sliceY)
   const dirRef = useRef(-1)
 
@@ -60,28 +61,25 @@ export default function SlicedHeart({
     sweepRef.current = sliceY
   }, [sliceY, sliceAxis])
 
-  useFrame((_, delta) => {
-    timeRef.current += delta
+  // ── Master-clock pulse + MRI sweep (was a drifting private sine clock) ──
+  useEffect(() => {
+    const unsub = onEngineFrame((s) => {
+      const k = Math.max(s.contractLV, s.contractRV)
+      const pulse = baseScale * (1 - 0.15 * k)
 
-    const bpm = heartRate / 60
-    const beat = Math.sin(timeRef.current * bpm * Math.PI * 2)
-    const pulse = baseScale + (beat > 0.8 ? (beat - 0.8) * 0.3 : 0)
+      if (groupRef.current) {
+        groupRef.current.scale.setScalar(pulse * 2)
+      }
 
-    if (groupRef.current) {
-      groupRef.current.scale.setScalar(pulse * 2)
-      groupRef.current.rotation.y += delta * 0.08
-    }
-
-    // MRI sweep
-    if (sweeping) {
-      sweepRef.current += dirRef.current * delta * (sweepSpeed || 1)
-
-      if (sweepRef.current <= -3) dirRef.current = 1
-      if (sweepRef.current >= 3) dirRef.current = -1
-
-      PLANE.constant = sweepRef.current
-    }
-  })
+      if (sweeping && groupRef.current) {
+        sweepRef.current += dirRef.current * 0.016 * (sweepSpeed || 1)
+        if (sweepRef.current <= -3) dirRef.current = 1
+        if (sweepRef.current >= 3) dirRef.current = -1
+        PLANE.constant = sweepRef.current
+      }
+    })
+    return unsub
+  }, [baseScale, sweeping, sweepSpeed])
 
   const gap = 0.03
 

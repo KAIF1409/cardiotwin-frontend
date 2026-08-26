@@ -1,150 +1,158 @@
-import { useEffect, useState } from 'react'
+/**
+ * StrainPanel.jsx  —  v2 (MASTER CLOCK EDITION)
+ * ═════════════════════════════════════════════
+ * Speckle-tracking strain gauges (GLS / LV / RV / LA / RA).
+ *
+ * v1 showed STATIC numbers that only changed when the backend pushed a
+ * value — offline they never moved.  Now the gauges are driven by the
+ * engine's instantaneous strain waveform: values contract toward their
+ * peak during systole and relax through diastole, in perfect lock-step
+ * with the mesh deformation and the ECG.  Live backend strainRegions
+ * still take priority when the WebSocket is flowing.
+ */
+
+import { useEffect, useRef, useState } from 'react'
+import { onEngineFrame } from '../simulation/cardiacEngine'
 import { subscribeHeartData } from '../services/apiService'
 
-const getStrainColor = (val) => {
-  const abs = Math.abs(val)
-  if (abs >= 18) return '#ab47bc'
-  if (abs >= 12) return '#ff9800'
-  return '#ef5350'
-}
-
-const getStrainLabel = (val) => {
-  const abs = Math.abs(val)
-  if (abs >= 18) return 'Normal'
-  if (abs >= 12) return 'Reduced'
-  return 'Abnormal'
-}
-
-const BASE_STRAIN        = { LV: -20.5, RV: -26.0, LA: -32.0, RA: -29.5, Global: -22.0 }
-const INFARCT_SENSITIVITY= { LV: 0.18,  RV: 0.09,  LA: 0.05,  RA: 0.04,  Global: 0.12  }
-const NORMAL_REF         = { LV: -20.5, RV: -26.0, LA: -32.0, RA: -29.5, Global: -22.0 }
+const NORMAL_REF = { Global: -22.0, LV: -20.5, RV: -26.0, LA: -32.0, RA: -29.5 }
+const INFARCT_SENSITIVITY = { Global: 0.12, LV: 0.18, RV: 0.09, LA: 0.05, RA: 0.04 }
 const MAX_ABS = 35
 
-export default function StrainPanel({ infarct = 0 }) {
-  const [liveStrain, setLiveStrain] = useState(null)
-  const [isLive,     setIsLive]     = useState(false)
+const toneFor = val => {
+  const abs = Math.abs(val)
+  if (abs >= 18) return 'good'     // emerald
+  if (abs >= 12) return 'warn'     // amber
+  return 'bad'                     // rose
+}
+const labelFor = val => (Math.abs(val) >= 18 ? 'Normal' : Math.abs(val) >= 12 ? 'Reduced' : 'Abnormal')
 
-  useEffect(() => {
-    const unsub = subscribeHeartData((data) => {
-      // Backend offline — revert to mock
-      if (!data) {
-        setLiveStrain(null)
-        setIsLive(false)
-        return
-      }
-      if (!data.strainRegions) return
+export default function StrainPanel({ infarct = 0 }) {
+  const [liveStrain, setLiveStrain]   = useState(null)
+  const [isLive, setIsLive]           = useState(false)
+  const [instant, setInstant]         = useState(null)   // instantaneous engine strain %
+  const barRefs = useRef({})
+
+  // live backend override
+  useEffect(() => (
+    subscribeHeartData(data => {
+      if (!data?.strainRegions) return
       const sr = data.strainRegions
       setLiveStrain({
-        LV:     parseFloat((sr.LV     ?? sr.lv     ?? sr.global ?? -0.205).toFixed(3)),
-        RV:     parseFloat((sr.RV     ?? sr.rv     ?? -0.26).toFixed(3)),
-        LA:     parseFloat((sr.LA     ?? sr.la     ?? -0.32).toFixed(3)),
-        RA:     parseFloat((sr.RA     ?? sr.ra     ?? -0.295).toFixed(3)),
         Global: parseFloat((sr.global ?? sr.Global ?? -0.22).toFixed(3)),
+        LV:     parseFloat((sr.LV     ?? sr.lv     ?? -0.205).toFixed(3)),
+        RV:     parseFloat((sr.RV     ?? sr.rv     ?? -0.26 ).toFixed(3)),
+        LA:     parseFloat((sr.LA     ?? sr.la     ?? -0.32 ).toFixed(3)),
+        RA:     parseFloat((sr.RA     ?? sr.ra     ?? -0.295).toFixed(3)),
       })
       setIsLive(true)
     })
-    return () => unsub?.()
+  ), [])
+
+
+  // ── Per-frame: animate bars via direct style writes + 10 Hz numerics ─────
+  useEffect(() => {
+    let lastUi = 0
+    return onEngineFrame(s => {
+      const now = performance.now()
+      const vals = {
+        Global: s.strainGlobal * 100,
+        LV:     s.strainLV * 100,
+        RV:     s.strainRV * 100,
+        LA:     s.strainLA * 100,
+        RA:     s.strainRA * 100,
+      }
+      Object.entries(vals).forEach(([k, v]) => {
+        const el = barRefs.current[k]
+        if (el) el.style.width = `${Math.min(100, (Math.abs(v) / MAX_ABS) * 100)}%`
+      })
+      if (now - lastUi > 100) {
+        lastUi = now
+        setInstant(vals)
+      }
+    })
   }, [])
 
-  // Build display strain — live values are decimals (e.g. -0.185) → convert to %
-  const strain = {}
-  Object.keys(BASE_STRAIN).forEach(key => {
-    if (liveStrain && liveStrain[key] != null) {
-      const raw = liveStrain[key] * 100  // -0.185 → -18.5
-      strain[key] = parseFloat(Math.min(-0.5, raw).toFixed(1))
+  // displayed peaks: live backend > infarct-adjusted baseline
+  const peaks = {}
+  Object.keys(NORMAL_REF).forEach(k => {
+    if (liveStrain && liveStrain[k] != null && !Number.isNaN(liveStrain[k])) {
+      peaks[k] = Math.min(-0.5, liveStrain[k] * 100)
     } else {
-      const raw = BASE_STRAIN[key] + (infarct * INFARCT_SENSITIVITY[key])
-      strain[key] = parseFloat(Math.min(-0.5, raw).toFixed(1))
+      peaks[k] = Math.min(-0.5, NORMAL_REF[k] + infarct * INFARCT_SENSITIVITY[k])
     }
   })
 
+  const currentVal = k => {
+    if (instant && instant[k] !== undefined && Math.abs(instant[k]) > 0.4) {
+      return parseFloat(instant[k].toFixed(1))
+    }
+    return peaks[k]
+  }
+
   return (
-    <div>
-      <div className="strain-header">
-        <h3 style={{ margin: 0 }}>📐 Strain Values</h3>
-        <span className="graph-live-badge" style={{
-          color:      isLive ? '#00ff88' : '#888',
-          background: isLive ? 'rgba(0,255,136,0.1)' : 'rgba(128,128,128,0.08)',
-        }}>
-          {isLive ? '⚡ REAL' : '◎ MOCK'}
+    <div className="strain-panel">
+      <div className="graph-head">
+        <span className="graph-title"><span className="graph-ic">📐</span>Strain</span>
+        <span className={`graph-badge ${isLive ? 'graph-badge-live' : ''}`}>
+          {isLive ? 'REAL' : 'MODEL'}
         </span>
-        <span className="strain-baseline-label">
-          {infarct > 0 ? `Infarct: ${infarct}%` : 'Baseline'}
+        <span className="graph-badge graph-badge-dim">
+          {infarct > 0 ? `Infarct ${infarct}%` : 'Baseline'}
         </span>
       </div>
 
-      {/* Summary badges */}
+      {/* Summary chips */}
       <div className="strain-summary-row">
-        <div className="strain-summary-badge" style={{ borderColor: '#00bcd444', color: '#00bcd4' }}>
-          <span className="strain-summary-val">{strain.Global}%</span>
-          <span className="strain-summary-lbl">Global GLS</span>
-        </div>
-        <div className="strain-summary-badge" style={{ borderColor: '#ab47bc44', color: '#ab47bc' }}>
-          <span className="strain-summary-val">{strain.LV}%</span>
-          <span className="strain-summary-lbl">LV Strain</span>
-        </div>
-        <div className="strain-summary-badge" style={{ borderColor: '#ff980044', color: '#ff9800' }}>
-          <span className="strain-summary-val">{strain.RV}%</span>
-          <span className="strain-summary-lbl">RV Strain</span>
-        </div>
+        {['Global', 'LV', 'RV'].map(k => {
+          const v = peaks[k]
+          return (
+            <div className="strain-chip" key={k} data-tone={toneFor(v)}>
+              <span className="strain-chip-val">{currentVal(k)}%</span>
+              <span className="strain-chip-lbl">{k === 'Global' ? 'GLS' : `${k} Strain`}</span>
+            </div>
+          )
+        })}
       </div>
 
-      {Object.entries(strain).map(([key, val]) => {
-        const color    = getStrainColor(val)
-        const lbl      = getStrainLabel(val)
-        const barWidth = Math.min(100, (Math.abs(val) / MAX_ABS) * 100)
+      {/* Gauge rows */}
+      {Object.entries(peaks).map(([key, peak]) => {
+        const cur      = currentVal(key)
         const refWidth = Math.min(100, (Math.abs(NORMAL_REF[key]) / MAX_ABS) * 100)
-        const isGlobal = key === 'Global'
-        const delta    = parseFloat((val - NORMAL_REF[key]).toFixed(1))
+        const delta    = parseFloat((cur - NORMAL_REF[key]).toFixed(1))
 
         return (
           <div className="strain-row" key={key}>
             <div className="strain-row-top">
-              <span className={isGlobal ? 'strain-key-global' : 'strain-key'}>
-                {isGlobal ? '⬡ Global' : key}
+              <span className={`strain-key ${key === 'Global' ? 'strain-key-global' : ''}`}>
+                {key === 'Global' ? '⬡ Global GLS' : key}
               </span>
               <div className="strain-badges">
-                <span className="strain-delta" style={{ color: delta >= 0 ? '#ef5350' : '#ab47bc' }}>
+                <span className="strain-delta" data-dir={delta >= 0 ? 'up' : 'down'}>
                   {delta >= 0 ? '▲' : '▼'}{Math.abs(delta)}
                 </span>
-                <span className="strain-label-badge"
-                  style={{ color, background: `${color}18`, border: `1px solid ${color}44` }}>
-                  {lbl}
-                </span>
-                <strong className="strain-value" style={{ color }}>{val}%</strong>
+                <span className="strain-label-badge" data-tone={toneFor(cur)}>{labelFor(cur)}</span>
+                <strong className="strain-value" data-tone={toneFor(cur)}>{cur}%</strong>
               </div>
             </div>
-            <div className={`strain-bar-bg ${isGlobal ? 'strain-bar-bg-global' : ''}`}
-              style={{ position: 'relative' }}>
-              <div className="strain-bar-fill" style={{
-                width: `${barWidth}%`,
-                background: `linear-gradient(90deg, ${color}cc, ${color})`,
-                boxShadow: `0 0 4px ${color}66`,
-              }} />
-              {/* Normal reference line */}
-              <div style={{
-                position: 'absolute', top: 0, bottom: 0,
-                left: `${refWidth}%`, width: '2px',
-                background: 'rgba(255,255,255,0.22)', borderRadius: '1px',
-              }} title={`Normal: ${NORMAL_REF[key]}%`} />
+            <div className="strain-bar-bg">
+              <div
+                className="strain-bar-fill"
+                data-tone={toneFor(cur)}
+                ref={el => { barRefs.current[key] = el }}
+                style={{ width: `${Math.min(100, (Math.abs(peak) / MAX_ABS) * 100)}%` }}
+              />
+              <div className="strain-ref-line" style={{ left: `${refWidth}%` }} title={`Normal ${NORMAL_REF[key]}%`} />
             </div>
           </div>
         )
       })}
 
       <div className="strain-legend">
-        {[
-          { color: '#ab47bc',              label: 'Normal ≥18%' },
-          { color: '#ff9800',              label: 'Reduced'     },
-          { color: '#ef5350',              label: 'Abnormal'    },
-          { color: 'rgba(255,255,255,0.22)', label: '│ Ref'    },
-        ].map(({ color, label }) => (
-          <div className="strain-legend-item" key={label}>
-            <div className="strain-legend-dot"
-              style={{ background: color, boxShadow: `0 0 4px ${color}` }} />
-            <span className="strain-legend-text">{label}</span>
-          </div>
-        ))}
+        <span className="strain-legend-item"><i data-tone="good" /> Normal ≥ −18%</span>
+        <span className="strain-legend-item"><i data-tone="warn" /> Reduced</span>
+        <span className="strain-legend-item"><i data-tone="bad" /> Abnormal</span>
+        <span className="strain-legend-item"><i className="ref" /> Ref</span>
       </div>
     </div>
   )
