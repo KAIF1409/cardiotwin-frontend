@@ -347,3 +347,6 @@ export function HeartLabelsHTML({
 
 // Legacy default export (no-op)
 export default function HeartLabels() { return null }
+
+// Public list for the viewport toolbar / camera focus system
+export const ANATOMY_MARKERS = LABEL_ANCHORS

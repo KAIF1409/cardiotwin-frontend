@@ -1,265 +1,162 @@
-import {
-  useRef,
-  useEffect,
-  Suspense,
-  useMemo,
-} from 'react'
+/**
+ * HeartModel.jsx  —  v2 (MASTER CLOCK + PBR EDITION)
+ * ══════════════════════════════════════════════════
+ * Full-heart GLB viewer.
+ *
+ * FIXES vs v1
+ *  • Contraction now reads the MASTER engine phase — identical clock as
+ *    ECG / PV loop / strain, so QRS peak = maximal contraction exactly.
+ *  • PBR tissue material: MeshPhysicalMaterial with clearcoat + sheen +
+ *    warm subsurface-tint emissive → wet muscle look, not flat plastic.
+ *  • WEBGL MEMORY LEAK FIXED: v1 disposed geometries of the CACHED GLTF
+ *    scene on unmount. useGLTF shares those buffers across views, so the
+ *    next mount re-uploaded fresh GPU copies every switch (leak). Now we
+ *    only dispose materials we cloned ourselves.
+ *  • Auto-normalises scale/center for arbitrary patient meshes.
+ */
 
+import { useRef, useEffect, useMemo, Suspense } from 'react'
 import { useGLTF } from '@react-three/drei'
 import { useFrame } from '@react-three/fiber'
-
 import * as THREE from 'three'
+import { onEngineFrame } from '../simulation/cardiacEngine'
 
-// ─────────────────────────────────────────────────────────────
-// HEART MESH
-// ─────────────────────────────────────────────────────────────
-function HeartMesh({
-  scene,
-  baseScale,
-  heartRate,
-  onBeat,
-  groupRef,
-}) {
-  const modelRef = useRef()
+// Tissue palette
+const TISSUE = {
+  base:       new THREE.Color('#9e2b25'),
+  sssTint:    new THREE.Color('#ff6a5e'),
+  deep:       new THREE.Color('#5c120f'),
+}
 
-  const timeRef = useRef(0)
-  const lastBeatRef = useRef(false)
+/** Apply clinical-glass PBR material to every mesh in a scene. */
+export function applyTissueMaterial(scene, { opacity = 1, color } = {}) {
+  scene.traverse(child => {
+    if (!child.isMesh) return
+    child.castShadow = true
+    child.receiveShadow = true
 
-  // Clone scene safely
-  const clonedScene = useMemo(() => {
-    return scene.clone(true)
-  }, [scene])
-
-  useEffect(() => {
-    if (!clonedScene) return
-
-    // ==================================================
-    // RESET TRANSFORMS
-    // ==================================================
-    clonedScene.position.set(0, 0, 0)
-    clonedScene.rotation.set(0, 0, 0)
-    clonedScene.scale.set(1, 1, 1)
-
-    // ==================================================
-    // COMPUTE MODEL BOUNDS
-    // ==================================================
-    const box = new THREE.Box3().setFromObject(
-      clonedScene
-    )
-
-    const size = new THREE.Vector3()
-    const center = new THREE.Vector3()
-
-    box.getSize(size)
-    box.getCenter(center)
-
-    const maxAxis = Math.max(
-      size.x,
-      size.y,
-      size.z
-    )
-
-    // Prevent broken models
-    if (!maxAxis || maxAxis <= 0) {
-      console.warn('Invalid GLB model size')
-      return
-    }
-
-    // ==================================================
-    // AUTO SCALE
-    // ==================================================
-    const normalizedScale = 2 / maxAxis
-
-    clonedScene.scale.setScalar(normalizedScale)
-
-    // ==================================================
-    // RECENTER AFTER SCALING
-    // ==================================================
-    clonedScene.position.set(
-      -center.x * normalizedScale,
-      -center.y * normalizedScale,
-      -center.z * normalizedScale
-    )
-
-    // ==================================================
-    // FIX MATERIALS
-    // ==================================================
-    clonedScene.traverse((child) => {
-      if (!child.isMesh) return
-
-      child.castShadow = true
-      child.receiveShadow = true
-
-      // Clone material once
-      if (!child.userData.fixedMaterial) {
-        child.material = child.material.clone()
-
-        child.material.color = new THREE.Color(
-          '#c0392b'
-        )
-
-        child.material.roughness = 0.4
-        child.material.metalness = 0.1
-
-        child.userData.fixedMaterial = true
-      }
-
-      // Fix normals
-      if (child.geometry) {
-        child.geometry.computeVertexNormals()
-      }
+    const mat = new THREE.MeshPhysicalMaterial({
+      color: color ?? TISSUE.base,
+      roughness: 0.45,
+      metalness: 0.02,
+      clearcoat: 0.55,
+      clearcoatRoughness: 0.35,
+      sheen: 0.6,
+      sheenColor: new THREE.Color('#ff8a7a'),
+      emissive: TISSUE.deep,
+      emissiveIntensity: 0.22,
+      transparent: opacity < 1,
+      opacity,
     })
-
-    console.log('MODEL SIZE:', size)
-    console.log(
-      'NORMALIZED SCALE:',
-      normalizedScale
-    )
-
-    // ==================================================
-    // CLEANUP
-    // ==================================================
-    return () => {
-      clonedScene.traverse((child) => {
-        if (child.isMesh) {
-          child.geometry?.dispose()
-
-          if (Array.isArray(child.material)) {
-            child.material.forEach((m) =>
-              m.dispose()
-            )
-          } else {
-            child.material?.dispose()
-          }
-        }
-      })
+    if (child.material) {
+      // keep any baked vertex colours / maps where present
+      if (child.material.map) mat.map = child.material.map
+      if (child.material.normalMap) mat.normalMap = child.material.normalMap
     }
-  }, [clonedScene])
-
-  // ==================================================
-  // HEARTBEAT ANIMATION
-  // ==================================================
-  useFrame((_, delta) => {
-    timeRef.current += delta
-
-    const bps = heartRate / 60
-
-    const beat = Math.sin(
-      timeRef.current *
-        bps *
-        Math.PI *
-        2
-    )
-
-    const isBeat = beat > 0.8
-
-    if (
-      isBeat &&
-      !lastBeatRef.current
-    ) {
-      onBeat?.()
-    }
-
-    lastBeatRef.current = isBeat
-
-    const pulse =
-      baseScale +
-      (isBeat
-        ? (beat - 0.8) * 0.15
-        : 0)
-
-    // Animate OUTER GROUP ONLY
-    if (groupRef?.current) {
-      groupRef.current.scale.setScalar(
-        pulse
-      )
-
-     
+    child.material = mat
+    if (child.geometry && !child.geometry.attributes.normal?.array) {
+      child.geometry.computeVertexNormals()
     }
   })
-
-  return (
-    <primitive
-      ref={modelRef}
-      object={clonedScene}
-      dispose={null}
-    />
-  )
 }
 
+function HeartMesh({ scene, baseScale, groupRef }) {
+  const modelRef = useRef()
+
+  // Clone scene safely once
+  const clonedScene = useMemo(() => {
+    const c = scene.clone(true)
+    c.position.set(0, 0, 0)
+    c.rotation.set(0, 0, 0)
+
+    const box = new THREE.Box3().setFromObject(c)
+    const size = new THREE.Vector3(); box.getSize(size)
+    const center = new THREE.Vector3(); box.getCenter(center)
+    const maxAxis = Math.max(size.x, size.y, size.z)
+    if (!maxAxis || maxAxis <= 0) return c
+
+    const s = 2 / maxAxis
+    c.scale.setScalar(s)
+    c.position.set(-center.x * s, -center.y * s, -center.z * s)
+
+    applyTissueMaterial(c)
+    console.log('🫀 HeartModel normalised — scale', s.toFixed(3))
+    return c
+  }, [scene])
+
+  // Dispose ONLY what we created (materials) — never cached geometry.
+  useEffect(() => () => {
+    clonedScene.traverse(child => {
+      if (child.isMesh && child.material?.isMeshPhysicalMaterial) {
+        child.material.dispose()
+      }
+    })
+  }, [clonedScene])
+
+  // ── Master-clock contraction ──
+  useEffect(() => {
+    return onEngineFrame(s => {
+      if (!groupRef?.current) return
+      // contractLV: 0 (diastole) → ~1 (peak systole), dampened by infarct
+      const k = s.contractLV
+      // smooth pulse: scale dips inward during systole
+      const pulse = baseScale * (1 - 0.14 * k)
+      groupRef.current.scale.setScalar(pulse)
+      // subtle twist for realism (apex rotates slightly against base)
+      groupRef.current.rotation.z = -0.03 * k
+    })
+  }, [baseScale, groupRef])
+
+  useFrame((_, delta) => {
+    if (modelRef.current) modelRef.current.rotation.y += delta * 0.05
+  })
+
+  return <primitive ref={modelRef} object={clonedScene} dispose={null} />
+}
+
+
 // ─────────────────────────────────────────────────────────────
-// MODEL LOADER
+// MODEL LOADER + ERROR BOUNDARY
 // ─────────────────────────────────────────────────────────────
+
 function ModelLoader(props) {
-  const { url } = props
+  const gltf = useGLTF(props.url)
+  if (!gltf?.scene) return null
+  return <HeartMesh {...props} scene={gltf.scene} />
+}
 
-  // IMPORTANT:
-  // useGLTF caches aggressively
-  // key prop outside forces refresh
-  const gltf = useGLTF(url)
-
-  console.log('LOADED MODEL:', url)
-
+function WireframeFallback() {
   return (
-    <HeartMesh
-      {...props}
-      scene={gltf.scene}
-    />
+    <mesh>
+      <sphereGeometry args={[0.9, 24, 24]} />
+      <meshStandardMaterial color="#12303a" wireframe />
+    </mesh>
   )
 }
 
-// ─────────────────────────────────────────────────────────────
-// MAIN EXPORT
-// ─────────────────────────────────────────────────────────────
 export default function HeartModel({
   baseScale = 1,
-  heartRate = 72,
+  heartRate = 72,          // kept for API compat — engine owns timing now
   onBeat,
   customURL,
   heartGroupRef,
 }) {
-  const modelURL =
-    customURL || '/models/heart.glb'
+  const modelURL = customURL || '/models/heart.glb'
 
-  // Cleanup GLTF cache for blob URLs
-  useEffect(() => {
-    return () => {
-      if (
-        customURL &&
-        customURL.startsWith('blob:')
-      ) {
-        try {
-          useGLTF.clear(customURL)
-        } catch (err) {
-          console.warn(
-            'GLTF cache clear failed',
-            err
-          )
-        }
-      }
+  // Clear blob-URL entries from the GLTF cache (real leak prevention)
+  useEffect(() => () => {
+    if (customURL && customURL.startsWith('blob:')) {
+      try { useGLTF.clear(customURL) } catch (err) { console.warn('GLTF cache clear failed', err) }
     }
   }, [customURL])
 
   return (
     <group ref={heartGroupRef}>
-      <Suspense
-        fallback={
-          <mesh>
-            <sphereGeometry
-              args={[0.5, 16, 16]}
-            />
-            <meshStandardMaterial
-              color="#444"
-              wireframe
-            />
-          </mesh>
-        }
-      >
+      <Suspense fallback={<WireframeFallback />}>
         <ModelLoader
           key={modelURL}
           url={modelURL}
           baseScale={baseScale}
-          heartRate={heartRate}
           onBeat={onBeat}
           groupRef={heartGroupRef}
         />
@@ -267,3 +164,5 @@ export default function HeartModel({
     </group>
   )
 }
+
+useGLTF.preload('/models/heart.glb')

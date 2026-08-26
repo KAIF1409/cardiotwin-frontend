@@ -8,20 +8,19 @@ export default function HeatmapLegend({ infarct }) {
   ]
 
   return (
-    <div style={{
-      position: 'absolute', bottom: '30px', right: '10px',
-      background: 'rgba(0,0,0,0.75)',
-      borderRadius: '8px', padding: '8px 12px',
-      border: '1px solid #333', fontSize: '11px'
-    }}>
-      <p style={{ color: '#aaa', margin: '0 0 6px 0' }}>🌡️ Strain Heatmap</p>
+    <div className="heatmap-legend">
+      <p style={{ color: 'var(--text-mut)', margin: '0 0 5px 0', letterSpacing: '.8px' }}>
+        🌡️ STRAIN HEATMAP
+      </p>
       {levels.map(({ color, label }) => (
-        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '6px', marginBottom: '3px' }}>
-          <div style={{ width: '12px', height: '12px', borderRadius: '3px', background: color }} />
-          <span style={{ color: '#ccc' }}>{label}</span>
+        <div key={label} style={{ display: 'flex', alignItems: 'center', gap: '7px' }}>
+          <div style={{ width: '11px', height: '11px', borderRadius: '3px', background: color, boxShadow: `0 0 6px ${color}66` }} />
+          <span>{label}</span>
         </div>
       ))}
-      <p style={{ color: '#555', margin: '6px 0 0 0', fontSize: '10px' }}>Infarct: {infarct}%</p>
+      <p style={{ color: 'var(--text-dim)', margin: '5px 0 0 0', fontSize: '9px', letterSpacing: '.8px' }}>
+        INFARCT {infarct}%
+      </p>
     </div>
   )
 }
