@@ -12,7 +12,7 @@
  * sliders → setEngineParams → every panel rescales together, same frame.
  */
 
-import { useState, useCallback, useEffect, useRef } from 'react'
+import { useState, useCallback, useEffect, useRef, Suspense } from 'react'
 import { Canvas } from '@react-three/fiber'
 import { CameraControls, useGLTF } from '@react-three/drei'
 import * as THREE from 'three'
@@ -371,15 +371,17 @@ export default function App() {
                   />
                 )}
                 {viewMode === 'slice' && (
-                  <SlicedHeart
-                    baseScale={activeBaseScale}
-                    heartRate={activeHr}
-                    sliceY={sliceState.sliceY}
-                    sliceAxis={sliceState.sliceAxis}
-                    sweeping={sliceState.sweeping}
-                    sweepSpeed={sliceState.sweepSpeed}
-                    customURL={customModelURL}
-                  />
+                  <Suspense fallback={null}>
+                    <SlicedHeart
+                      baseScale={activeBaseScale}
+                      heartRate={activeHr}
+                      sliceY={sliceState.sliceY}
+                      sliceAxis={sliceState.sliceAxis}
+                      sweeping={sliceState.sweeping}
+                      sweepSpeed={sliceState.sweepSpeed}
+                      customURL={customModelURL}
+                    />
+                  </Suspense>
                 )}
                 {viewMode === 'chamber' && (
                   <ChamberHeart
@@ -414,13 +416,15 @@ export default function App() {
                 minDistance={1.4}
                 maxDistance={9}
               />
+
+              {/* R3F hooks must be inside Canvas — HeartLabels3D uses useThree/useFrame */}
+              <HeartLabels3D
+                heartGroupRef={heartGroupRef}
+                onProjected={handleProjected}
+              />
             </Canvas>
 
             {/* HTML overlays above the canvas */}
-            <HeartLabels3D
-              heartGroupRef={heartGroupRef}
-              onProjected={handleProjected}
-            />
             {viewMode === 'full' && (
               <HeartLabelsHTML
                 labels={labelState}
@@ -478,3 +482,7 @@ export default function App() {
     </div>
   )
 }
+
+
+
+
