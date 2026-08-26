@@ -60,13 +60,14 @@ export default function SliceControls({
               <span>{sliceY.toFixed(1)}</span>
             </div>
             <input
+              className="glass-range"
               type="range" min="-3" max="3" step="0.05"
               value={sliceY}
               onChange={e => { setSweeping(false); setSliceY(Number(e.target.value)) }}
             />
           </div>
 
-          <div style={{ borderTop: '1px solid var(--c-border)', margin: '2px 0' }} />
+          <div style={{ borderTop: '1px solid var(--border)', margin: '2px 0' }} />
 
           {/* MRI Auto-sweep */}
           <div className="slider-label" style={{ marginBottom: '4px' }}>
@@ -87,6 +88,7 @@ export default function SliceControls({
               <span>{sweepSpeed}×</span>
             </div>
             <input
+              className="glass-range"
               type="range" min="1" max="5" step="0.5"
               value={sweepSpeed}
               onChange={e => setSweepSpeed(Number(e.target.value))}
