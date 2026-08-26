@@ -141,26 +141,10 @@ export default function PatientSelector({ onSelectPatient, currentPatient }) {
 
   return (
     <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
-      <h3 style={{
-        color: '#00bcd4', fontSize: '11px',
-        margin: 0, letterSpacing: '2px', textTransform: 'uppercase',
-      }}>
-        👤 Patient
-      </h3>
-
       <select
         onChange={handleChange}
         defaultValue="patient085"
-        style={{
-          background:   '#0f0f1a',
-          border:       '1px solid #00bcd444',
-          color:        '#00bcd4',
-          borderRadius: '6px',
-          padding:      '7px 10px',
-          fontSize:     '11px',
-          cursor:       'pointer',
-          width:        '100%',
-        }}
+        aria-label="Select patient"
       >
         {PATIENTS.map(p => (
           <option key={p.id} value={p.id}>{p.label}</option>
@@ -168,14 +152,14 @@ export default function PatientSelector({ onSelectPatient, currentPatient }) {
       </select>
 
       {loading && (
-        <p style={{ color: '#555', fontSize: '10px', margin: 0 }}>
+        <p style={{ color: 'var(--text-dim)', fontSize: '10px', margin: 0 }}>
           Loading patient data…
         </p>
       )}
 
       {/* Mesh fallback warning */}
       {meshWarning && !loading && (
-        <p style={{ color: '#ff9800', fontSize: '10px', margin: 0 }}>
+        <p style={{ color: 'var(--amber)', fontSize: '10px', margin: 0 }}>
           ⚠️ {meshWarning}
         </p>
       )}
@@ -183,17 +167,18 @@ export default function PatientSelector({ onSelectPatient, currentPatient }) {
       {/* Patient baseline metrics */}
       {currentPatient?.metrics && (
         <div style={{
-          background: '#0f0f1a', borderRadius: '6px',
+          background: 'rgba(10,13,20,.5)', borderRadius: '8px',
+          border: '1px solid var(--border)',
           padding: '6px 8px', fontSize: '10px',
         }}>
-          <div style={{ color: '#555', marginBottom: '2px' }}>Patient baseline:</div>
-          <div style={{ color: '#00e676' }}>
-            EF: {currentPatient.metrics.ef}% -- {currentPatient.metrics.efStatus}
+          <div style={{ color: 'var(--text-dim)', marginBottom: '2px' }}>Patient baseline:</div>
+          <div style={{ color: 'var(--emerald)' }}>
+            EF: {currentPatient.metrics.ef}% — {currentPatient.metrics.efStatus}
           </div>
-          <div style={{ color: '#00bcd4' }}>
-            EDV: {currentPatient.metrics.edv} ml | ESV: {currentPatient.metrics.esv} ml
+          <div style={{ color: 'var(--cyan)' }}>
+            EDV: {currentPatient.metrics.edv} ml · ESV: {currentPatient.metrics.esv} ml
           </div>
-          <div style={{ color: '#00bcd4' }}>
+          <div style={{ color: 'var(--cyan)' }}>
             Wall: {currentPatient.metrics.wallThickness} mm
           </div>
         </div>

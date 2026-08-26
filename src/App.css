@@ -254,11 +254,13 @@ body {
 /* floating toolbar */
 .viewport-toolbar {
   position: absolute; top: 12px; left: 50%; transform: translateX(-50%);
-  display: flex; align-items: center; gap: 10px;
-  padding: 6px 10px; z-index: 30;
+  display: flex; flex-wrap: wrap; justify-content: center; align-items: center;
+  gap: 8px; row-gap: 6px;
+  max-width: calc(100% - 24px);
+  padding: 6px 12px; z-index: 30;
   background: var(--glass-hi);
   backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
-  border: 1px solid var(--border); border-radius: 999px;
+  border: 1px solid var(--border); border-radius: 18px;
   box-shadow: var(--shadow);
 }
 .vt-group { display: flex; gap: 4px; align-items: center; }
@@ -279,7 +281,7 @@ body {
 }
 .vt-btn.flow-on.active { color: var(--magenta); border-color: rgba(255,46,147,.5); background: rgba(255,46,147,.08); box-shadow: 0 0 18px -6px rgba(255,46,147,.6); }
 
-.vt-focus-row { display: flex; gap: 4px; }
+.vt-focus-row { display: flex; flex-wrap: wrap; justify-content: center; gap: 4px; max-width: 300px; }
 .vt-chip {
   --chip: var(--cyan);
   font-size: 9.5px; font-weight: 700; letter-spacing: .8px;

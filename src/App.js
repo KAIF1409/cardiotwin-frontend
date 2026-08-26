@@ -245,18 +245,18 @@ export default function App() {
     setActiveFocus(marker.id === activeFocus ? null : marker.id)
     const cc = cameraRef.current
     if (!cc || !cc.camera) return
-    const dir = marker.normal.clone().normalize().multiplyScalar(2.6)
+    const dir = marker.normal.clone().normalize().multiplyScalar(1.8)
     const camPos = new THREE.Vector3(
-      marker.pos.x * 1.6 + dir.x + 0.4,
-      marker.pos.y * 1.6 + dir.y + 0.3,
-      marker.pos.z * 1.6 + dir.z + 2.4,
+      marker.pos.x * 1.5 + dir.x,
+      marker.pos.y * 1.5 + dir.y + 0.15,
+      marker.pos.z * 1.5 + dir.z + 3.0,   // stays at human-scale distance
     )
     cc.setLookAt(camPos.x, camPos.y, camPos.z, marker.pos.x, marker.pos.y, marker.pos.z, true)
   }, [activeFocus])
 
   const resetView = () => {
     setActiveFocus(null)
-    cameraRef.current?.setLookAt(0.4, 0.2, 3.4, 0, 0, 0, true)
+    cameraRef.current?.setLookAt(0, 0, 5, 0, 0, 0, true)
   }
 
   // Education modules request camera focus via this bus event
@@ -349,17 +349,24 @@ export default function App() {
 
           <div className="canvas-wrap">
             <Canvas
-              shadows
+              shadows="percentage"
               dpr={[1, 2]}
-              camera={{ position: [0.4, 0.2, 3.4], fov: 45, near: 0.1, far: 100 }}
+              camera={{ position: [0, 0, 5], fov: 45, near: 0.1, far: 100 }}
               gl={{ antialias: true, powerPreference: 'high-performance' }}
             >
               {/* ── Clinical lighting rig (3-point + subsurface rims) ── */}
               <ambientLight intensity={0.38} color="#b8c6e0" />
-              <directionalLight position={[4, 5, 6]} intensity={1.35} color="#eaf4ff" castShadow />
+              <directionalLight position={[4, 5, 6]} intensity={1.35} color="#eaf4ff" />
               <pointLight position={[-5, -2, -4]} intensity={14} distance={14} color="#ff5a7a" />
               <pointLight position={[0, 3, -6]}  intensity={18} distance={16} color="#00F2FE" />
               <pointLight position={[3, -4, 2]}  intensity={8}  distance={10} color="#2563EB" />
+
+              {/* 3-D projector MUST live inside the Canvas — it drives the
+                  HTML label overlay positions via onProjected */}
+              <HeartLabels3D
+                heartGroupRef={heartGroupRef}
+                onProjected={handleProjected}
+              />
 
               {/* ── Heart model per view mode ── */}
               <group ref={heartGroupRef}>
@@ -415,12 +422,6 @@ export default function App() {
                 smoothTime={0.35}
                 minDistance={1.4}
                 maxDistance={9}
-              />
-
-              {/* R3F hooks must be inside Canvas — HeartLabels3D uses useThree/useFrame */}
-              <HeartLabels3D
-                heartGroupRef={heartGroupRef}
-                onProjected={handleProjected}
               />
             </Canvas>
 
