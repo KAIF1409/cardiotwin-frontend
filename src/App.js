@@ -39,6 +39,7 @@ import EducationHub from './components/education/EducationHub'
 import LearningCard from './components/education/LearningCard'
 import CauseEffectPopup from './components/education/CauseEffectPopup'
 import { PericardiumSac, InnerChambers, ValveSet } from './components/three/CardiacLayers'
+import ConductionSystem from './components/three/ConductionSystem'
 
 import useHeartData from './hooks/useHeartData'
 import useIsMobile from './hooks/useIsMobile'
@@ -113,6 +114,7 @@ export default function App() {
     valves:      true,     // procedural Tricuspid/Mitral/Aortic/Pulmonary
     arteries:    true,
     veins:       true,
+    conduction:  false,    // ⚡ SA→AV→His→Purkinje electrophysiology overlay
   })
   const toggleLayer = useCallback((k, v) =>
     setLayers(s => ({ ...s, [k]: v ?? !s[k] })), [])
@@ -539,6 +541,11 @@ export default function App() {
                   {viewMode === 'full' && layers.pericardium && <PericardiumSac />}
                   {viewMode === 'full' && layers.chambers     && <InnerChambers />}
                   {viewMode === 'full' && layers.valves       && <ValveSet />}
+
+                  {/* ⚡ Electrophysiology — ignites with P wave → QRS sweep */}
+                  {viewMode === 'full' && (
+                    <ConductionSystem enabled={layers.conduction} />
+                  )}
 
                   {viewMode === 'deform' && (
                     <DeformableHeart

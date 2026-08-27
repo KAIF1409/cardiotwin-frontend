@@ -363,6 +363,10 @@ export function setCirculationMode(mode) {
 
 export function setConductionOverlay(on) { conductionOverlay = !!on }
 
+/** Whether the electrophysiology overlay flag is currently raised
+ *  (used by the 3-D ConductionSystem to auto-show during PUC lessons). */
+export function isConductionOverlayOn() { return conductionOverlay }
+
 /** apiService pushes live backend samples here (sanitised). */
 export function pushLiveSample(raw = {}) {
   live.active = true

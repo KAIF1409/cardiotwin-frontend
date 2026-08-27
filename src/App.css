@@ -1112,6 +1112,7 @@ button.primary:hover:not(:disabled) { filter: brightness(1.12); }
 .an-badge[data-circuit="chamber"] { border-color: rgba(171,71,188,.40); }
 .an-badge[data-circuit="valve"]   { border-color: rgba(255,220,180,.45); }
 .an-badge[data-circuit="sac"]     { border-color: rgba(124,212,255,.45); }
+.an-badge[data-circuit="conduction"] { border-color: rgba(16,185,129,.45); }
 .heart-hover-badge { min-width: 168px; }
 
 /* ═══════════════════════════════════════════════════════════════════

@@ -18,6 +18,7 @@ const LAYER_ITEMS = [
   { key: 'valves',      label: 'Valves',      icon: '✳️' },
   { key: 'arteries',    label: 'Arteries',    icon: '🔴' },
   { key: 'veins',       label: 'Veins',       icon: '🔵' },
+  { key: 'conduction',  label: 'Conduction',  icon: '⚡' },
 ]
 
 export default function ViewportToolbar({
