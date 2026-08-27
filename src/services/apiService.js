@@ -41,16 +41,26 @@ import { pushLiveSample } from '../simulation/cardiacEngine'
 // Environment-aware endpoints. Works with EITHER variable naming:
 //   REACT_APP_API_URL / REACT_APP_WS_URL   (preferred)
 //   REACT_APP_API_BASE / REACT_APP_WS_BASE (legacy)
-// On Vercel (no backend running) leave these unset — the app falls back
-// to a clean local physics simulation without hammering a dead host.
-const API_BASE = process.env.REACT_APP_API_URL  ||
-                 process.env.REACT_APP_API_BASE ||
-                 'http://127.0.0.1:8000'
-const WS_BASE  = process.env.REACT_APP_WS_URL   ||
-                 process.env.REACT_APP_WS_BASE  ||
-                 'ws://127.0.0.1:8000/ws'
+//
+// PHASE-5 NETWORK DISCIPLINE
+// ──────────────────────────
+// Production builds deployed WITHOUT endpoint env vars (e.g. Vercel with
+// no backend) now run in pure-OFFLINE mode: every fetch/WebSocket call
+// short-circuits, so deployments never spam dead 127.0.0.1:8000 requests.
+// Development keeps the localhost convenience defaults; setting either
+// env var re-enables live backend streaming anywhere.
+const ENV_API = process.env.REACT_APP_API_URL  ||
+                process.env.REACT_APP_API_BASE
+const ENV_WS  = process.env.REACT_APP_WS_URL   ||
+                process.env.REACT_APP_WS_BASE
 
 const IS_PROD = process.env.NODE_ENV === 'production'
+
+/** True ⇒ transport is fully disabled; local physics engine only. */
+export const OFFLINE_MODE = IS_PROD && !ENV_API && !ENV_WS
+
+const API_BASE = ENV_API ?? 'http://127.0.0.1:8000'
+const WS_URL   = ENV_WS   ?? 'ws://127.0.0.1:8000/ws'
 
 // Console discipline: in production only the FIRST occurrence of each
 // warning is printed; dev keeps full verbosity.
@@ -220,7 +230,7 @@ function connectWebSocket() {
 
   let ws
   try {
-    ws = new WebSocket(WS_BASE)
+    ws = new WebSocket(WS_URL)
   } catch (e) {
     warnOnce('ws-ctor', '⚠️ WS constructor failed:', e?.message)
     enterOfflineMode()
@@ -244,7 +254,7 @@ function connectWebSocket() {
     stopHttpPoll()
     clearOfflineProbe()
     setConnState('online_ws')
-    console.log('✅ WebSocket connected to', WS_BASE)
+    console.log('✅ WebSocket connected to', WS_URL)
   }
 
   ws.onmessage = (event) => {
@@ -398,6 +408,15 @@ export async function startHeartEngine() {
   manualStop = false
   lastSampleAt = Date.now()
 
+  // PHASE-5: production deploy without backend env vars ⇒ zero network.
+  // The master cardiacEngine drives every panel locally; connection badge
+  // settles straight to OFFLINE without a single failed request.
+  if (OFFLINE_MODE) {
+    setConnState('offline')
+    console.info('🛰️ Offline mode — local physics simulation only (set REACT_APP_API_URL to connect a backend)')
+    return
+  }
+
   try {
     await fetch(`${API_BASE}/start`, {
       method: 'POST',
@@ -425,9 +444,11 @@ export async function startHeartEngine() {
 
 export async function stopHeartEngine() {
   manualStop = true
-  try {
-    await fetch(`${API_BASE}/stop`, { method: 'POST' })
-  } catch { /* best-effort */ }
+  if (!OFFLINE_MODE) {
+    try {
+      await fetch(`${API_BASE}/stop`, { method: 'POST' })
+    } catch { /* best-effort */ }
+  }
 
   if (reconnectTimer) { clearTimeout(reconnectTimer); reconnectTimer = null }
   if (watchdogTimer) { clearInterval(watchdogTimer); watchdogTimer = null }
@@ -462,6 +483,7 @@ export async function stopHeartEngine() {
  * @param {number} infarct_pct    — slider value 0–100
  */
 export async function sendSliderParams(contractility, afterload, infarct_pct) {
+  if (OFFLINE_MODE) return   // PHASE-5: no transport in offline deploys
   // Normalise 0–100 slider range → backend 0–2.0 multiplier range
   const contractilityNorm = parseFloat(((contractility / 100) * 2.0).toFixed(3))
   const afterloadNorm     = parseFloat(((afterload     / 100) * 2.0).toFixed(3))
@@ -565,6 +587,8 @@ export async function sendPresetToEngine(presetLabel) {
     'Constrictive': 'normal',
   }
 
+  if (OFFLINE_MODE) return   // PHASE-5: no transport in offline deploys
+
   const preset = presetMap[presetLabel]
   if (!preset) {
     console.warn('⚠️ Unknown preset label (no backend mapping):', presetLabel)
@@ -590,6 +614,7 @@ export async function sendPresetToEngine(presetLabel) {
 }
 
 export async function fetchSimulateCycle() {
+  if (OFFLINE_MODE) return null   // PHASE-5
   try {
     const res = await fetch(`${API_BASE}/simulate_cycle`, {
       signal: AbortSignal.timeout(5000),
@@ -616,6 +641,7 @@ export async function fetchSimulateCycle() {
  * Returns the full metrics.json structure or null on failure.
  */
 export async function fetchMetrics() {
+  if (OFFLINE_MODE) return null   // PHASE-5
   try {
     const res = await fetch(`${API_BASE}/metrics`, {
       signal: AbortSignal.timeout(5000),
@@ -632,6 +658,9 @@ export async function fetchMetrics() {
 }
 
 export async function checkAPIHealth() {
+  if (OFFLINE_MODE) {
+    return { status: 'offline', message: 'Offline mode — local simulation' }
+  }
   try {
     const res = await fetch(`${API_BASE}/`, {
       method: 'GET',
