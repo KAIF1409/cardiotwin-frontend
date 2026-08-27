@@ -41,6 +41,7 @@ import CauseEffectPopup from './components/education/CauseEffectPopup'
 import { PericardiumSac, InnerChambers, ValveSet } from './components/three/CardiacLayers'
 
 import useHeartData from './hooks/useHeartData'
+import useIsMobile from './hooks/useIsMobile'
 
 import baselineMetrics from './data/internMetrics'
 import {
@@ -117,9 +118,17 @@ export default function App() {
     setLayers(s => ({ ...s, [k]: v ?? !s[k] })), [])
 
   // ── Collapsible drawer sidebars + immersive fullscreen ──
-  const [dockOpen, setDockOpen] = useState(true)
-  const [teleOpen, setTeleOpen] = useState(true)
+  // On phones (≤900px) both panels open as slide-over SHEETS over the
+  // canvas, driven by a bottom navigation bar; they start closed there.
+  const isMobile = useIsMobile()
+  const [dockOpen, setDockOpen] = useState(() => !window.matchMedia('(max-width: 900px)').matches)
+  const [teleOpen, setTeleOpen] = useState(() => !window.matchMedia('(max-width: 900px)').matches)
   const [fullscreen, setFullscreen] = useState(false)
+
+  // Crossing into the phone layout closes any desktop-opened sheets
+  useEffect(() => {
+    if (isMobile) { setDockOpen(false); setTeleOpen(false) }
+  }, [isMobile])
 
   useEffect(() => { if (!showLabels) setLabelState([]) }, [showLabels])
 
@@ -401,7 +410,7 @@ export default function App() {
 
   // ══════════════════════════ RENDER ══════════════════════════
   return (
-    <div className={`app ${fullscreen ? 'fs-on' : ''}`} data-mode={appMode}>
+    <div className={`app ${fullscreen ? 'fs-on' : ''} ${isMobile ? 'mobile' : ''}`} data-mode={appMode}>
 
       {!fullscreen && (
         <HeaderBar
@@ -467,7 +476,7 @@ export default function App() {
           <div className="canvas-wrap">
             <Canvas
               shadows="percentage"
-              dpr={[1, 2]}
+              dpr={isMobile ? [1, 1.5] : [1, 2]}
               camera={{ position: [0, 0, 5], fov: 45, near: 0.1, far: 100 }}
               gl={{ antialias: true, powerPreference: 'high-performance' }}
             >
@@ -621,13 +630,15 @@ export default function App() {
           </div>
           <div className="tele-inner">
             <div className="tele-card">
-              <ECGGraph heartRate={activeHr} ef={activeEf} infarct={activeInfarct} height={132} />
+              <ECGGraph heartRate={activeHr} ef={activeEf} infarct={activeInfarct}
+                        height={isMobile ? 96 : 132} />
             </div>
             <div className="tele-card">
               <PVLoop
                 preload={activeParams.Preload} afterload={activeParams.Afterload}
                 heartRate={activeHr} infarct={activeInfarct}
-                valve={activeValve} ef={activeEf} height={158}
+                valve={activeValve} ef={activeEf}
+                height={isMobile ? 118 : 158}
               />
             </div>
             <div className="tele-card">
@@ -664,6 +675,42 @@ export default function App() {
             ⤢ Exit Fullscreen
           </button>
         </div>
+      )}
+
+      {/* ── Mobile: tap-away scrim under slide-over sheets ── */}
+      {isMobile && !fullscreen && (dockOpen || teleOpen) && (
+        <div
+          className="mobile-scrim"
+          onClick={() => { setDockOpen(false); setTeleOpen(false) }}
+          aria-hidden="true"
+        />
+      )}
+
+      {/* ── Mobile bottom navigation (thumb-reachable, 48px+ targets) ── */}
+      {isMobile && !fullscreen && (
+        <nav className="mnav" aria-label="Mobile navigation">
+          <button
+            className={`mnav-btn ${dockOpen ? 'on' : ''}`}
+            onClick={() => { setTeleOpen(false); setDockOpen(o => !o) }}
+          >⚙️<span>Controls</span></button>
+          <button
+            className={`mnav-btn ${teleOpen ? 'on' : ''}`}
+            onClick={() => { setDockOpen(false); setTeleOpen(o => !o) }}
+          >📊<span>Vitals</span></button>
+          <button
+            className={`mnav-btn ${showLabels ? 'on' : ''}`}
+            onClick={() => setShowLabels(v => !v)}
+          >🏷️<span>Labels</span></button>
+          <button
+            className={`mnav-btn ${appMode === 'education' && eduOpen ? 'on' : ''}`}
+            onClick={() => {
+              if (appMode === 'education' && eduOpen) { closeEduHub(); return }
+              setDockOpen(false); setTeleOpen(false)
+              openEduHub()
+            }}
+          >🎓<span>Edu</span></button>
+          <button className="mnav-btn" onClick={enterFullscreen}>⛶<span>Immerse</span></button>
+        </nav>
       )}
 
       {/* ── Education overlays (FIX: gated by dedicated eduOpen flag so the

@@ -1114,3 +1114,263 @@ button.primary:hover:not(:disabled) { filter: brightness(1.12); }
 .an-badge[data-circuit="sac"]     { border-color: rgba(124,212,255,.45); }
 .heart-hover-badge { min-width: 168px; }
 
+/* ═══════════════════════════════════════════════════════════════════
+   MOBILE COMPATIBILITY LAYER  ·  ≤900 px single-column shell
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Universal touch hygiene — kills double-tap zoom delay, iOS tap flash,
+   pull-to-refresh and rubber-band overscroll everywhere. */
+html, body { overscroll-behavior: none; }
+body, #root, button { -webkit-tap-highlight-color: transparent; }
+button { touch-action: manipulation; }
+
+/* Dynamic viewport height — fixes iOS Safari's collapsing 100vh bars */
+@supports (height: 100dvh) {
+  .app { height: 100dvh; }
+}
+
+@media (max-width: 900px) {
+
+  /* ── Shell morphs to a vertical stack: header / stage / bottom-nav ── */
+  .app.mobile { display: flex; flex-direction: column; }
+
+  /* Compact clinical header */
+  .header {
+    height: auto;
+    margin: calc(env(safe-area-inset-top, 0px) + 8px) 8px 8px;
+    padding: 7px 10px;
+    gap: 8px;
+    border-radius: 14px;
+    grid-template-columns: auto minmax(0, 1fr) auto;
+  }
+  .brand        { gap: 7px; min-width: 0; }
+  .brand-glyph  { font-size: 17px; }
+  .brand-name   { font-size: 13px; white-space: nowrap; }
+  .header-meters{ gap: 6px; justify-content: flex-end; }
+  .bp-chip, .ef-chip { display: none; }              /* Vitals live in 📊 panel */
+  .bpm-meter    { padding: 4px 9px; }
+  .bpm-value    { font-size: 14px; }
+  .conn-badge   { font-size: 8.5px; padding: 3px 7px; letter-spacing: .8px; }
+  .mode-switch button { padding: 5px 9px; font-size: 10px; }
+  .fs-btn       { height: 28px; padding: 0 9px; font-size: 10px; letter-spacing: .4px; }
+
+  /* Stage owns the remaining space */
+  .layout {
+    display: flex;
+    flex-direction: column;
+    flex: 1;
+    min-height: 0;
+    padding: 0 8px 8px;
+    gap: 0;
+  }
+  .stage { flex: 1; border-radius: 16px; }
+
+  /* Two-finger camera gestures must never fight browser pinch-zoom */
+  .canvas-wrap canvas { touch-action: none; }
+
+  /* Floating toolbar hugs thumb reach without stealing width */
+  .viewport-toolbar {
+    top: 8px; left: 8px; right: 8px;
+    transform: none; max-width: none;
+    padding: 6px; gap: 6px; row-gap: 6px;
+    border-radius: 16px;
+  }
+  .vt-btn     { min-width: 38px; height: 38px; font-size: 16px; }
+  .vt-btn-txt { display: none; }                      /* icon-only chrome */
+  .vt-divider { height: 22px; }
+  .vt-focus-row {                                   /* swipeable chip rail */
+    order: 10; width: 100%;
+    flex-wrap: nowrap; overflow-x: auto;
+    max-width: 100%; justify-content: flex-start;
+    scrollbar-width: none; padding-bottom: 2px;
+  }
+  .vt-focus-row::-webkit-scrollbar { display: none; }
+  .vt-chip { flex: 0 0 auto; padding: 7px 11px; font-size: 10.5px; }
+
+  /* Layers popover must never overflow the screen edge */
+  .layers-pop { left: auto; right: 0; transform: none; }
+  @keyframes popIn { from { opacity: 0; transform: translateY(-6px); } }
+  .layer-row { padding: 9px 8px; }                    /* roomier taps */
+
+  /* ── Side panels become full-height SLIDE-OVER SHEETS ── */
+  .control-dock, .telemetry {
+    position: fixed;
+    top: 0; bottom: 0;
+    z-index: 70;
+    width: min(86vw, 340px);
+    border-radius: 0;
+    box-shadow: 0 24px 64px rgba(0, 0, 0, .62);
+    transition: transform .42s cubic-bezier(.25,.85,.3,1);
+    will-change: transform;
+  }
+  .control-dock {
+    left: 0;
+    border-right: 1px solid var(--panel-border);
+    border-radius: 0 18px 18px 0;
+    transform: translateX(-104%);                     /* parked away */
+  }
+  .telemetry {
+    right: 0;
+    border-left: 1px solid var(--panel-border);
+    border-radius: 18px 0 0 18px;
+    transform: translateX(104%);
+  }
+  /* open state = simply NOT .slid */
+  .control-dock:not(.slid),
+  .telemetry:not(.slid) { transform: none; }
+
+  /* desktop inner-slide machinery is inert here (the ASIDE moves instead) */
+  .no-left        .dock-inner,
+  .no-right       .tele-inner,
+  .telemetry.slid .tele-inner { transform: none !important; opacity: 1 !important; }
+  .control-dock.slid .dock-inner,
+  .telemetry.slid     .tele-inner { opacity: 0; }
+
+  .dock-scroll   { padding: 10px; }
+  .tele-inner    { padding: 10px; gap: 10px; }
+  .tele-card     { padding: 11px 12px; }
+  .panel-strip   { padding-top: calc(env(safe-area-inset-top, 0px) + 8px); }
+
+  /* bigger touch targets on accordions & controls */
+  .dock-head      { padding: 12px 10px; }
+  .strip-btn      { width: 30px; height: 30px; font-size: 13px; }
+  .glass-range    { height: 26px; }
+  .dp-top-btn     { padding: 11px 12px; }
+
+  /* larger grab-rails when sheets are parked */
+  .edge-tab { width: 34px; height: 96px; font-size: 14px; }
+
+  /* ── Tap-away backdrop between canvas and an open sheet ── */
+  .mobile-scrim {
+    position: fixed; inset: 0;
+    z-index: 66;
+    background: rgba(4, 6, 12, .55);
+    backdrop-filter: blur(2px); -webkit-backdrop-filter: blur(2px);
+    animation: scrimIn .25s ease;
+  }
+  @keyframes scrimIn { from { opacity: 0; } }
+
+  /* ── Thumb-reachable bottom navigation bar ── */
+  .mnav {
+    position: relative;
+    z-index: 75;
+    display: flex; gap: 5px;
+    margin: 0 8px calc(8px + env(safe-area-inset-bottom, 0px));
+    padding: 6px;
+    background: var(--glass-hi);
+    backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+    border: 1px solid var(--border);
+    border-radius: 20px;
+    box-shadow: var(--shadow);
+  }
+  .mnav-btn {
+    flex: 1;
+    display: flex; flex-direction: column;
+    align-items: center; justify-content: center; gap: 3px;
+    min-height: 54px;
+    font-family: var(--ff); font-size: 17px;
+    color: var(--text-mut);
+    background: transparent; border: none; border-radius: 15px;
+    cursor: pointer; transition: all .2s;
+  }
+  .mnav-btn span {
+    font-size: 8.5px; font-weight: 800; letter-spacing: .9px;
+    text-transform: uppercase; color: inherit;
+  }
+  .mnav-btn.on {
+    color: var(--cyan);
+    background: rgba(0,242,254,.09);
+    box-shadow: inset 0 0 0 1px rgba(0,242,254,.35), var(--glow-cyan);
+  }
+  .mnav-btn:active { transform: scale(.94); }
+
+  /* Labels' EF/EDV strip would sit under the toolbar → pin above nav */
+  .labels-layer > div:first-child { top: auto !important; bottom: 58px; }
+
+  /* ── Education hub becomes a BOTTOM SHEET ── */
+  .edu-hub {
+    left: 8px; right: 8px;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 6px);
+    width: auto;
+    max-height: min(74dvh, 600px);
+    border-radius: 20px;
+    z-index: 80;
+    animation: hubSheetIn .32s cubic-bezier(.2,.9,.3,1.15);
+  }
+  @keyframes hubSheetIn { from { opacity: 0; transform: translateY(28px); } }
+  .edu-module-head { padding: 13px 10px; }
+  .edu-tab         { padding: 7px 13px; font-size: 11px; }
+  .edu-close       { width: 32px; height: 32px; }
+
+  /* Reopen pill floats centered over the nav */
+  .edu-fab {
+    right: auto;
+    left: 50%;
+    top: auto;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 84px);
+    transform: translateX(-50%);
+    align-items: center;
+    z-index: 58;
+  }
+  .edu-fab:hover { transform: translateX(-50%) translateY(-1px); }
+
+  /* Immersive mode works on phones too — dock wraps above home indicator */
+  .immersive-dock {
+    flex-wrap: wrap; justify-content: center;
+    width: calc(100vw - 20px); max-width: 520px;
+    bottom: calc(env(safe-area-inset-bottom, 0px) + 10px);
+    padding: 8px 10px; gap: 6px;
+  }
+  .id-btn { min-width: 40px; height: 40px; }
+
+  .lock-toast { bottom: calc(env(safe-area-inset-bottom, 0px) + 86px); font-size: 11.5px; }
+
+  /* keep momentum scrolling inside sheets instead of chaining to the page */
+  .dock-scroll, .tele-inner, .edu-modules, .dp-sub-list.open {
+    overscroll-behavior: contain;
+    -webkit-overflow-scrolling: touch;
+  }
+}
+
+/* Immersive fullscreen ON PHONES must also drop the bottom nav + sheets */
+.app.fs-on .mnav,
+.app.fs-on .mobile-scrim,
+.app.fs-on .control-dock,
+.app.fs-on .telemetry { display: none !important; }
+.app.fs-on .layout    { padding: 0 !important; }
+
+/* ── Portrait phones & very compact viewports ─────────────────────── */
+@media (max-width: 560px) {
+  .header       { margin-inline: 6px; padding: 6px 8px; }
+  .brand-name   { font-size: 12px; }
+  .brand-tag    { display: none; }
+  .bpm-phase    { display: none; }
+  .conn-badge   { font-size: 8px; }
+  .mode-switch button { font-size: 9.5px; padding: 4px 8px; }
+
+  .layout        { padding: 0 6px 6px; }
+  .stage         { border-radius: 14px; }
+  .viewport-toolbar { left: 6px; right: 6px; }
+
+  .control-dock, .telemetry { width: min(94vw, 340px); }
+
+  .mnav          { margin-inline: 6px; border-radius: 17px; }
+  .mnav-btn      { min-height: 50px; font-size: 16px; }
+  .edu-fab       { bottom: calc(env(safe-area-inset-bottom, 0px) + 76px);
+                   font-size: 11.5px; padding: 9px 13px; }
+
+  .ecg-stats-row { gap: 4px; }
+  .pv-stats-row  { gap: 3px; }
+  .graph-title   { letter-spacing: 1.1px; font-size: 10.5px; }
+}
+
+/* ── Landscape phones: reclaim every vertical pixel ────────────────── */
+@media (max-height: 480px) and (orientation: landscape) {
+  .header  { margin-top: calc(env(safe-area-inset-top, 0px) + 4px);
+             margin-bottom: 4px; padding-block: 4px; }
+  .mnav-btn{ min-height: 44px; flex-direction: row; gap: 6px; }
+  .mnav-btn span { font-size: 9px; }
+  .edu-hub { max-height: min(84dvh, 480px); }
+}
+

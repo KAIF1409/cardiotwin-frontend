@@ -3,8 +3,14 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
+    <!-- Mobile UX: viewport-fit=cover exposes the notch areas to CSS
+         (safe-area insets); pinch-zoom disabled so two-finger gestures
+         are reserved exclusively for the 3-D camera controls. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
     <meta name="theme-color" content="#0A0D14" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent" />
     <meta
       name="description"
       content="CardioTwin-X — real-time cardiac digital twin: ECG, PV loops, strain mapping, blood-flow simulation and SSLC/PUC curriculum learning."
