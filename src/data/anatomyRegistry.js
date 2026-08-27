@@ -42,7 +42,7 @@ export const FLOW_STYLE = {
 }
 
 // ── Hover/focus bus (imperative, zero-react for 60 fps safety) ───────────────
-// Any component may write `.focusId`; BloodFlowParticles reads it per frame to
+// Any component may write `.focusId`; BloodFlowSystem reads it per frame to
 // brighten + accelerate the highlighted circuit — no React state involved.
 export const flowBus = { focusId: null }
 
@@ -239,6 +239,14 @@ export const JOURNEYS = {
   systemic:  ['PVL', 'PVR', 'MITRAL', 'AO'],
   pulmonary: ['SVC', 'IVC', 'TRIC', 'PAT', 'PAL', 'PAR'],
 }
+
+// Populate the hover-id → circuit lookup NOW that PATHS exists.
+// Keys are upper-cased path ids (AO · PAT · LAD …) plus uppercase registry
+// keys so both naming styles resolve from anywhere in the app.
+Object.values(PATHS).forEach(p => {
+  CIRCUIT_OF_ID[p.id.toUpperCase()]       = p.circuit
+  CIRCUIT_OF_ID[String(p.id).toUpperCase()] = p.circuit
+})
 
 // ═════════════════════════════════════════════════════════════════════════════
 // CAMERA-FOCUS MARKERS  (chips / click targets — mirrors ANATOMY_MARKERS shape)
