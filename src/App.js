@@ -38,6 +38,7 @@ import { VESSEL_MARKERS } from './data/anatomyRegistry'
 import EducationHub from './components/education/EducationHub'
 import LearningCard from './components/education/LearningCard'
 import CauseEffectPopup from './components/education/CauseEffectPopup'
+import { PericardiumSac, InnerChambers, ValveSet } from './components/three/CardiacLayers'
 
 import useHeartData from './hooks/useHeartData'
 
@@ -55,6 +56,15 @@ import {
   freezeAtPhase,
   setEngineSpeed,
 } from './simulation/cardiacEngine'
+import { CARDIAC_RIG } from './data/anatomyRegistry'
+
+// Marker ids living in CARDIAC space (heart-normalised units) — these must be
+// mapped through CARDIAC_RIG before driving the camera. Thorax/bone markers
+// are already in world space.
+const CARDIAC_MARKER_IDS = new Set(
+  [...ANATOMY_MARKERS].map(m => m.id),
+)
+VESSEL_MARKERS.forEach(m => CARDIAC_MARKER_IDS.add(m.id))
 
 const DEFAULT_PARAMS = {
   Preload: 50, Afterload: 50, Contractility: 60,
@@ -90,6 +100,29 @@ export default function App() {
   const cameraRef = useRef(null)
   const heartGroupRef = useRef()
 
+  // ── On-demand labels — DEFAULT OFF per spec §1.2 ──
+  const [showLabels, setShowLabels] = useState(false)
+
+  // ── Deep anatomical layers (Phase-1 enterprise engine) ──
+  const [layers, setLayers] = useState({
+    skeleton:    true,
+    pericardium: true,
+    myocardium:  true,     // outer GLB wall — opacity drops when chambers ON
+    chambers:    false,    // inner endocardial shells
+    valves:      true,     // procedural Tricuspid/Mitral/Aortic/Pulmonary
+    arteries:    true,
+    veins:       true,
+  })
+  const toggleLayer = useCallback((k, v) =>
+    setLayers(s => ({ ...s, [k]: v ?? !s[k] })), [])
+
+  // ── Collapsible drawer sidebars + immersive fullscreen ──
+  const [dockOpen, setDockOpen] = useState(true)
+  const [teleOpen, setTeleOpen] = useState(true)
+  const [fullscreen, setFullscreen] = useState(false)
+
+  useEffect(() => { if (!showLabels) setLabelState([]) }, [showLabels])
+
   // Live backend data
   const { heartData } = useHeartData()
 
@@ -110,6 +143,9 @@ export default function App() {
   const [eduHeartOverride, setEduHeartOverride] = useState(null) // {params, viewMode}
   const [unlocked, setUnlocked] = useState([])
   const [showLockToast, setShowLockToast] = useState(false)
+  // FIX(education-modal): dedicated visibility flag — the X button was bound
+  // to appMode which never changed, so the panel could never close.
+  const [eduOpen, setEduOpen] = useState(false)
 
   useEffect(() => { startHeartEngine() }, [])
 
@@ -245,17 +281,27 @@ export default function App() {
     })
 
   // ── Camera focus (anatomical markers) ────────────────────────────────────
+  // Cardiac-space markers are mapped through CARDIAC_RIG so the camera lands
+  // on the TRUE world position of the (scaled, seated) anatomy.
   const focusOn = useCallback(marker => {
     setActiveFocus(marker.id === activeFocus ? null : marker.id)
     const cc = cameraRef.current
     if (!cc || !cc.camera) return
+
+    const isCardiac = CARDIAC_MARKER_IDS.has(marker.id)
+    const world = isCardiac
+      ? marker.pos.clone()
+          .multiplyScalar(CARDIAC_RIG.scale)
+          .add(new THREE.Vector3(...CARDIAC_RIG.pos))
+      : marker.pos.clone()
+
     const dir = marker.normal.clone().normalize().multiplyScalar(1.8)
     const camPos = new THREE.Vector3(
-      marker.pos.x * 1.5 + dir.x,
-      marker.pos.y * 1.5 + dir.y + 0.15,
-      marker.pos.z * 1.5 + dir.z + 3.0,   // stays at human-scale distance
+      world.x * 1.5 + dir.x,
+      world.y * 1.5 + dir.y + 0.15,
+      world.z * 1.5 + dir.z + 3.0,   // stays at human-scale distance
     )
-    cc.setLookAt(camPos.x, camPos.y, camPos.z, marker.pos.x, marker.pos.y, marker.pos.z, true)
+    cc.setLookAt(camPos.x, camPos.y, camPos.z, world.x, world.y, world.z, true)
   }, [activeFocus])
 
   const resetView = () => {
@@ -305,19 +351,75 @@ export default function App() {
     setEngineSpeed(1)
   }, [])
 
+  // ── Education modal open/close (FIX: X button + Escape both unmount it) ──
+  const openEduHub = useCallback(() => {
+    setAppMode('education')
+    setEduOpen(true)
+  }, [])
+
+  const closeEduHub = useCallback(() => {
+    setEduOpen(false)
+    closeAllEduTools()
+  }, [closeAllEduTools])
+
+  // ── Immersive fullscreen (Phase-2 §2) ─────────────────────────────────────
+  const enterFullscreen = useCallback(() => {
+    setDockOpen(false)
+    setTeleOpen(false)
+    setFullscreen(true)
+    try {
+      document.documentElement.requestFullscreen?.()?.catch?.(() => {})
+    } catch { /* iframe/embedded — UI immersion still applies */ }
+  }, [])
+
+  const exitFullscreen = useCallback(() => {
+    setFullscreen(false)
+    setDockOpen(true)
+    setTeleOpen(true)
+    try {
+      if (document.fullscreenElement) document.exitFullscreen?.()?.catch?.(() => {})
+    } catch { /* noop */ }
+  }, [])
+
+  // Escape closes the education modal FIRST, then exits fullscreen;
+  // native-fullscreen exits (browser chrome) also resync our flag.
+  useEffect(() => {
+    const onKey = e => {
+      if (e.key !== 'Escape') return
+      if (eduOpen)          { setEduOpen(false); return }
+      if (fullscreen)       exitFullscreen()
+    }
+    window.addEventListener('keydown', onKey)
+    return () => window.removeEventListener('keydown', onKey)
+  }, [eduOpen, fullscreen, exitFullscreen])
+
+  useEffect(() => {
+    const onFsChange = () => { if (!document.fullscreenElement && fullscreen) exitFullscreen() }
+    document.addEventListener('fullscreenchange', onFsChange)
+    return () => document.removeEventListener('fullscreenchange', onFsChange)
+  }, [fullscreen, exitFullscreen])
+
   // ══════════════════════════ RENDER ══════════════════════════
   return (
-    <div className="app" data-mode={appMode}>
+    <div className={`app ${fullscreen ? 'fs-on' : ''}`} data-mode={appMode}>
 
-      <HeaderBar
-        appMode={appMode}
-        onModeChange={m => { setAppMode(m); if (m === 'clinical') closeAllEduTools() }}
-        sysBP={sysBP} diaBP={diaBP}
-      />
+      {!fullscreen && (
+        <HeaderBar
+          appMode={appMode}
+          onModeChange={m => {
+            setAppMode(m)
+            if (m === 'education') setEduOpen(true)   // opening education = open hub
+            else { setEduOpen(false); closeAllEduTools() }
+          }}
+          fullscreenOn={fullscreen}
+          onToggleFullscreen={() => (fullscreen ? exitFullscreen() : enterFullscreen())}
+          sysBP={sysBP} diaBP={diaBP}
+        />
+      )}
 
-      <div className="layout">
+      <div className={`layout ${!dockOpen ? 'no-left' : ''} ${!teleOpen ? 'no-right' : ''}`}>
 
-        {/* ── Left: Control Dock ── */}
+        {/* ── Left: Control Dock (collapsible drawer) ── */}
         <ControlDock
           params={activeParams}
           onSlider={handleSlider}
@@ -327,6 +429,8 @@ export default function App() {
           onPreset={handlePreset}
           onSelectPatient={handleSelectPatient}
           currentPatient={currentPatient}
+          collapsed={!dockOpen || fullscreen}
+          onToggleCollapse={() => setDockOpen(o => !o)}
           slice={{
             ...sliceState,
             setSliceY: v => patchSlice({ sliceY: v }),
@@ -351,6 +455,10 @@ export default function App() {
             onToggleFlow={() => setShowBloodFlow(f => !f)}
             thoraxOn={showThorax}
             onToggleThorax={() => setShowThorax(t => !t)}
+            labelsOn={showLabels}
+            onToggleLabels={() => setShowLabels(v => !v)}
+            layers={layers}
+            onSetLayer={toggleLayer}
             focusTargets={[...ANATOMY_MARKERS, ...VESSEL_MARKERS]}
             onFocus={focusOn}
             activeFocus={activeFocus}
@@ -376,32 +484,71 @@ export default function App() {
                          intensity={26} distance={18} color="#fff4ea" />
 
               {/* 3-D projector MUST live inside the Canvas — it drives the
-                  HTML label overlay positions via onProjected */}
-              <HeartLabels3D
-                heartGroupRef={heartGroupRef}
-                onProjected={handleProjected}
-              />
+                  HTML label overlay positions via onProjected. Mounted ONLY
+                  while labels are toggled ON (default OFF per spec §1.2). */}
+              {showLabels && (
+                <HeartLabels3D
+                  heartGroupRef={heartGroupRef}
+                  onProjected={handleProjected}
+                  enabled
+                />
+              )}
 
               {/* ── Heart model per view mode ── */}
               <group ref={heartGroupRef}>
-                {/* Thoracic skeleton frame — anatomical scale context (full view) */}
-                {viewMode === 'full' && (
-                  <ThoraxFramework visible={showThorax} />
+
+                {/* Thoracic skeleton frame — stays at WORLD scale; the cardiac
+                    rig is scaled INTO it for real anatomical proportions */}
+                {viewMode === 'full' && showThorax && layers.skeleton && (
+                  <ThoraxFramework visible />
                 )}
 
-                {/* Complete vascular tree — interactive tubes sharing the
-                    registry curves that drive the blood-flow particles */}
-                {(viewMode === 'full' || viewMode === 'deform') && (
-                  <VascularSystem />
-                )}
+                {/* ══ CARDIAC RIG — anatomical seating of the whole cardiac
+                    block: heart + vessels + valves + pericardium + flow all
+                    share ONE transform (scale .60, left-of-midline, anterior).
+                    Focus chips / label anchors map through CARDIAC_RIG. */}
+                <group position={CARDIAC_RIG.pos} scale={CARDIAC_RIG.scale}>
 
-                {viewMode === 'full' && (
-                  <HeartModel
-                    baseScale={activeBaseScale}
-                    heartRate={activeHr}
-                    customURL={customModelURL}
-                  />
-                )}
+                  {/* Complete vascular tree — interactive tubes sharing the
+                      registry curves that drive the blood-flow particles */}
+                  {(viewMode === 'full' || viewMode === 'deform') && (
+                    <VascularSystem
+                      layers={{ arteries: layers.arteries, veins: layers.veins }}
+                    />
+                  )}
+
+                  {viewMode === 'full' && layers.myocardium && (
+                    <HeartModel
+                      baseScale={activeBaseScale}
+                      heartRate={activeHr}
+                      customURL={customModelURL}
+                      tissueOpacity={layers.chambers ? 0.52 : 1}
+                    />
+                  )}
+
+                  {/* Procedural deep-anatomy layers (dynamic fallback engine) */}
+                  {viewMode === 'full' && layers.pericardium && <PericardiumSac />}
+                  {viewMode === 'full' && layers.chambers     && <InnerChambers />}
+                  {viewMode === 'full' && layers.valves       && <ValveSet />}
+
+                  {viewMode === 'deform' && (
+                    <DeformableHeart
+                      baseScale={activeBaseScale}
+                      heartRate={activeHr}
+                      infarct={activeInfarct}
+                      customURL={customModelURL}
+                      strainRegions={heartData?.strainRegions ?? null}
+                      regionMap={regionMap}
+                    />
+                  )}
+
+                  {showBloodFlow && viewMode !== 'slice' && (
+                    <BloodFlowSystem />
+                  )}
+                </group>
+
+                {/* Slice mode stays in raw heart units — its slider Y-coords
+                    target the un-rigged 2-unit heart */}
                 {viewMode === 'slice' && (
                   <Suspense fallback={null}>
                     <SlicedHeart
@@ -415,6 +562,7 @@ export default function App() {
                     />
                   </Suspense>
                 )}
+
                 {viewMode === 'chamber' && (
                   <ChamberHeart
                     baseScale={activeBaseScale}
@@ -423,20 +571,6 @@ export default function App() {
                     selectedChamber={selectedChamber}
                     infarct={activeInfarct}
                   />
-                )}
-                {viewMode === 'deform' && (
-                  <DeformableHeart
-                    baseScale={activeBaseScale}
-                    heartRate={activeHr}
-                    infarct={activeInfarct}
-                    customURL={customModelURL}
-                    strainRegions={heartData?.strainRegions ?? null}
-                    regionMap={regionMap}
-                  />
-                )}
-
-                {showBloodFlow && viewMode !== 'slice' && (
-                  <BloodFlowSystem />
                 )}
               </group>
 
@@ -451,7 +585,7 @@ export default function App() {
             </Canvas>
 
             {/* HTML overlays above the canvas */}
-            {viewMode === 'full' && (
+            {viewMode === 'full' && showLabels && (
               <HeartLabelsHTML
                 labels={labelState}
                 selectedChamber={selectedChamber}
@@ -465,38 +599,93 @@ export default function App() {
             {(viewMode === 'deform' || viewMode === 'chamber') && (
               <HeatmapLegend infarct={activeInfarct} />
             )}
+
+            {/* Edge rails — bring drawers back after sliding them away */}
+            {!fullscreen && !dockOpen && (
+              <button className="edge-tab left" onClick={() => setDockOpen(true)}
+                      title="Slide controls back in">▶</button>
+            )}
+            {!fullscreen && !teleOpen && (
+              <button className="edge-tab right" onClick={() => setTeleOpen(true)}
+                      title="Slide telemetry back in">◀</button>
+            )}
           </div>
         </main>
 
-        {/* ── Right: Telemetry & Analytics ── */}
-        <aside className="telemetry">
-          <div className="tele-card">
-            <ECGGraph heartRate={activeHr} ef={activeEf} infarct={activeInfarct} height={132} />
+        {/* ── Right: Telemetry & Analytics (collapsible drawer) ── */}
+        <aside className={`telemetry ${!teleOpen || fullscreen ? 'slid' : ''}`}>
+          <div className="panel-strip">
+            <span className="panel-strip-label">TELEMETRY</span>
+            <button className="strip-btn" onClick={() => setTeleOpen(false)}
+                    title="Slide panel away">▶</button>
           </div>
-          <div className="tele-card">
-            <PVLoop
-              preload={activeParams.Preload} afterload={activeParams.Afterload}
-              heartRate={activeHr} infarct={activeInfarct}
-              valve={activeValve} ef={activeEf} height={158}
-            />
-          </div>
-          <div className="tele-card">
-            <StrainPanel infarct={activeInfarct} />
+          <div className="tele-inner">
+            <div className="tele-card">
+              <ECGGraph heartRate={activeHr} ef={activeEf} infarct={activeInfarct} height={132} />
+            </div>
+            <div className="tele-card">
+              <PVLoop
+                preload={activeParams.Preload} afterload={activeParams.Afterload}
+                heartRate={activeHr} infarct={activeInfarct}
+                valve={activeValve} ef={activeEf} height={158}
+              />
+            </div>
+            <div className="tele-card">
+              <StrainPanel infarct={activeInfarct} />
+            </div>
           </div>
         </aside>
       </div>
 
-      {/* ── Education overlays ── */}
-      {isEducation && (
+      {/* ── Immersive fullscreen bottom dock ── */}
+      {fullscreen && (
+        <div className="immersive-dock">
+          <button className="id-btn" onClick={() => zoomBy(-0.55)} title="Zoom in">＋</button>
+          <button className="id-btn" onClick={() => zoomBy(0.75)} title="Zoom out">－</button>
+          <button className="id-btn" onClick={resetView} title="Reset camera">
+            <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
+              <path d="M3 12a9 9 0 1 0 3-6.7" strokeLinecap="round"/>
+              <path d="M3 4v5h5" strokeLinecap="round" strokeLinejoin="round"/>
+            </svg>
+          </button>
+          <i className="id-sep" />
+          <button
+            className={`id-btn ${showLabels ? 'on' : ''}`}
+            onClick={() => setShowLabels(v => !v)}
+            title="Toggle anatomical labels"
+          >🏷️</button>
+          <button
+            className={`id-btn flow ${showBloodFlow ? 'on' : ''}`}
+            onClick={() => setShowBloodFlow(f => !f)}
+            title="Blood-flow vectors"
+          >🩸</button>
+          <i className="id-sep" />
+          <button className="id-btn exit" onClick={exitFullscreen}>
+            ⤢ Exit Fullscreen
+          </button>
+        </div>
+      )}
+
+      {/* ── Education overlays (FIX: gated by dedicated eduOpen flag so the
+              ✕ button, Escape key and mode switch all close it cleanly) ── */}
+      {isEducation && eduOpen && (
         <>
           <EducationHub
             unlocked={unlocked}
-            onClose={closeAllEduTools}
+            onClose={closeEduHub}
             onHeartSync={handleHeartSync}
           />
           <LearningCard selected={selectedChamber} onClose={() => setSelectedChamber(null)} />
           <CauseEffectPopup trigger={activePreset} />
         </>
+      )}
+
+      {/* Reopen pill when the hub is closed but still in Education Mode */}
+      {isEducation && !eduOpen && !fullscreen && (
+        <button className="edu-fab" onClick={openEduHub}>
+          🎓 Education Hub
+          <span className="edu-fab-sub">SSLC · PUC tracks</span>
+        </button>
       )}
 
       {/* ── Lock toast ── */}

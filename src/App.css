@@ -873,9 +873,244 @@ button.primary:hover:not(:disabled) { filter: brightness(1.12); }
   to   { opacity: 1; transform: none; }
 }
 
-/* Metric numerals — strict tabular figures across telemetry & header */
-.bpm-value, .bp-val, .strain-chip-val, .strain-value,
-.tele-card canvas + * , .graph-title ~ span {
-  font-variant-numeric: tabular-nums;
+
+/* ═══════════════════════════════════════════════════════════════════
+   PHASE-2 · COLLAPSIBLE DRAWER SIDE PANELS
+   ═══════════════════════════════════════════════════════════════════ */
+
+/* Drawer handle strip — pinned header on both side panels */
+.panel-strip {
+  display: flex; align-items: center; justify-content: space-between;
+  padding: 8px 10px 7px 12px;
+  border-bottom: 1px solid var(--border);
+  flex-shrink: 0;
 }
+.panel-strip-label {
+  font-family: var(--ff-display); font-size: 9px; font-weight: 800;
+  letter-spacing: 2.2px; color: var(--text-dim);
+}
+.strip-btn {
+  width: 22px; height: 22px; border-radius: 6px; cursor: pointer;
+  border: 1px solid var(--border); background: rgba(10,13,20,.5);
+  color: var(--text-mut); font-size: 10px; line-height: 1;
+  display: inline-flex; align-items: center; justify-content: center;
+  transition: all .2s; flex-shrink: 0;
+}
+.strip-btn:hover {
+  color: var(--cyan); border-color: rgba(0,242,254,.4);
+  background: rgba(0,242,254,.08); box-shadow: var(--glow-cyan);
+}
+
+/* Slide-out wrappers — translateX(-100%) / translateX(+100%) per spec §2.1 */
+.dock-inner, .tele-inner {
+  display: flex; flex-direction: column;
+  min-height: 0; overflow: hidden; flex: 1;
+  transition: transform .42s cubic-bezier(.25,.85,.3,1), opacity .3s ease;
+  will-change: transform;
+}
+.control-dock { display: flex; flex-direction: column; min-height: 0; }
+.control-dock .dock-scroll { flex: 1; min-height: 0; }
+
+/* scrolling lives on the sliding wrapper, not the outer drawer */
+.telemetry        { gap: 0; }
+.telemetry .tele-inner { gap: 12px; overflow-y: auto; scrollbar-width: thin; }
+
+.no-left        .dock-inner { transform: translateX(-108%); opacity: 0; pointer-events: none; }
+.no-right       .tele-inner { transform: translateX(108%);  opacity: 0; pointer-events: none; }
+.telemetry.slid .tele-inner { transform: translateX(112%);  opacity: 0; pointer-events: none; }
+
+/* Grid collapses the reserved track while inner content slides away.
+   grid-template-columns transitions in Chromium/FF; the inner translate
+   keeps motion buttery on every engine regardless. */
+.layout { transition: grid-template-columns .42s cubic-bezier(.25,.85,.3,1); }
+.layout.no-left        { grid-template-columns: 0px minmax(0,1fr) 340px; }
+.layout.no-right       { grid-template-columns: 300px minmax(0,1fr) 0px; }
+.layout.no-left.no-right { grid-template-columns: 0px minmax(0,1fr) 0px; }
+
+.no-left  .control-dock,
+.no-right .telemetry,
+.telemetry.slid           { border-color: transparent; box-shadow: none; overflow: hidden; }
+
+@media (max-width: 1280px) {
+  .layout.no-left          { grid-template-columns: 0px minmax(0,1fr) 320px; }
+  .layout.no-right         { grid-template-columns: 280px minmax(0,1fr) 0px; }
+  .layout.no-left.no-right { grid-template-columns: 0px minmax(0,1fr) 0px; }
+}
+
+/* Slim edge tabs appear ONLY when a drawer is fully away */
+.edge-tab {
+  position: absolute; top: 50%; transform: translateY(-50%);
+  z-index: 32;
+  width: 26px; height: 72px; padding: 0;
+  border: 1px solid var(--border-hi); border-radius: 9px;
+  background: var(--glass-hi);
+  backdrop-filter: blur(14px); -webkit-backdrop-filter: blur(14px);
+  color: var(--cyan); font-size: 11px; cursor: pointer;
+  display: flex; align-items: center; justify-content: center;
+  box-shadow: var(--shadow), var(--glow-cyan);
+  animation: edgeIn .35s cubic-bezier(.2,.9,.3,1.15);
+}
+.edge-tab.left  { left: 8px; }
+.edge-tab.right { right: 8px; }
+.edge-tab:hover { background: rgba(0,242,254,.12); }
+@keyframes edgeIn { from { opacity: 0; } }
+
+/* ═══ Immersive fullscreen — chrome vanishes, canvas owns the screen ══ */
+.fs-btn {
+  height: 30px; padding: 0 13px; cursor: pointer;
+  font-family: var(--ff); font-size: 11px; font-weight: 700; letter-spacing: .6px;
+  color: var(--text-mut); background: rgba(10,13,20,.55);
+  border: 1px solid var(--border); border-radius: 999px;
+  transition: all .22s; white-space: nowrap;
+}
+.fs-btn:hover { color: #fff; border-color: rgba(0,242,254,.45); box-shadow: var(--glow-cyan); }
+.fs-btn.active {
+  color: #fff; border-color: rgba(255,46,147,.5);
+  background: linear-gradient(135deg, rgba(255,46,147,.16), rgba(37,99,235,.16));
+  box-shadow: 0 0 18px -6px rgba(255,46,147,.65);
+}
+
+.app.fs-on { background: #07090E; }
+.app.fs-on .header,
+.app.fs-on .viewport-toolbar,
+.app.fs-on .edu-fab,
+.app.fs-on .edu-hub,
+.app.fs-on .lock-toast,
+.app.fs-on .heatmap-legend { display: none !important; }
+
+.app.fs-on .layout {
+  grid-template-columns: 0px minmax(0,100%) 0px;
+  gap: 0; padding: 0;
+}
+.app.fs-on .stage {
+  border-radius: 0; border: none; box-shadow: none;
+  background: transparent;
+  backdrop-filter: none; -webkit-backdrop-filter: none;
+}
+.app.fs-on .canvas-wrap { position: fixed; inset: 0; z-index: 5; }
+
+/* floating minimal controls pinned to the bottom centre (spec §2.2) */
+.immersive-dock {
+  position: fixed; left: 50%; bottom: 18px; transform: translateX(-50%);
+  z-index: 60;
+  display: flex; align-items: center; gap: 7px;
+  padding: 9px 13px;
+  background: var(--glass-hi);
+  backdrop-filter: blur(18px); -webkit-backdrop-filter: blur(18px);
+  border: 1px solid rgba(0,242,254,.20); border-radius: 999px;
+  box-shadow: var(--shadow), 0 0 34px -14px rgba(0,242,254,.45);
+  animation: dockUp .38s cubic-bezier(.2,.9,.3,1.15);
+}
+@keyframes dockUp { from { opacity: 0; transform: translateX(-50%) translateY(14px); } }
+.id-btn {
+  min-width: 34px; height: 34px; padding: 0 11px; border-radius: 999px;
+  display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+  background: rgba(10,13,20,.55); color: var(--text-mut);
+  border: 1px solid var(--border); cursor: pointer;
+  font-family: var(--ff); font-size: 15px;
+  transition: all .2s;
+}
+.id-btn:hover { color: #fff; background: rgba(0,242,254,.12); border-color: rgba(0,242,254,.35); }
+.id-btn.on {
+  color: var(--cyan); border-color: rgba(0,242,254,.55);
+  background: rgba(0,242,254,.1); box-shadow: var(--glow-cyan);
+}
+.id-btn.flow.on {
+  color: var(--magenta); border-color: rgba(255,46,147,.55);
+  background: rgba(255,46,147,.09); box-shadow: 0 0 16px -6px rgba(255,46,147,.6);
+}
+.id-btn.exit { font-size: 11.5px; font-weight: 700; letter-spacing: .5px; color: var(--rose); }
+.id-btn.exit:hover {
+  color: #fff; border-color: rgba(239,83,80,.5);
+  background: rgba(239,83,80,.1);
+  box-shadow: 0 0 14px -5px rgba(239,83,80,.6);
+}
+.id-sep { width: 1px; height: 20px; background: var(--border); }
+
+/* Reopen pill for the education hub after it has been closed */
+.edu-fab {
+  position: absolute; right: 372px; top: 76px; z-index: 58;
+  display: flex; flex-direction: column; align-items: flex-start; gap: 2px;
+  padding: 10px 16px; cursor: pointer;
+  font-family: var(--ff-display); font-weight: 800; font-size: 12.5px;
+  color: var(--cyan);
+  background: var(--glass-hi);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid rgba(0,242,254,.28); border-radius: 14px;
+  box-shadow: var(--shadow), 0 0 26px -12px rgba(0,242,254,.5);
+  transition: all .22s;
+}
+.edu-fab:hover { transform: translateY(-1px); border-color: rgba(0,242,254,.55); }
+.edu-fab-sub { font-family: var(--ff); font-size: 9px; font-weight: 600; letter-spacing: 1px; color: var(--text-dim); }
+
+/* ═══ ON-DEMAND LABEL LAYER — clean fade in/out (spec §1.2) ════════ */
+.labels-layer {
+  opacity: 0;
+  transition: opacity .38s ease;
+}
+.labels-layer.on { opacity: 1; }
+
+/* toolbar text-microlabels for Labels / Layers buttons */
+.vt-btn-txt {
+  font-size: 10px; font-weight: 700; letter-spacing: .8px;
+  margin-left: 4px; text-transform: uppercase;
+}
+
+/* ── Deep-anatomy layers popover ────────────────────────────────── */
+.vt-layers-wrap { position: relative; display: inline-flex; }
+.glass-pop {
+  background: rgba(15, 20, 31, 0.92);
+  backdrop-filter: blur(16px); -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--border);
+}
+.layers-pop {
+  position: absolute; top: calc(100% + 9px); left: 50%;
+  transform: translateX(-50%);
+  z-index: 70;
+  width: 198px; padding: 10px;
+  border-radius: 12px;
+  box-shadow: var(--shadow), 0 0 30px -14px rgba(0,242,254,.4);
+  animation: popIn .22s cubic-bezier(.2,.9,.3,1.15);
+}
+@keyframes popIn { from { opacity: 0; transform: translateX(-50%) translateY(-6px); } }
+.layers-pop-head {
+  font-family: var(--ff-display); font-size: 8.5px; font-weight: 800;
+  letter-spacing: 2px; color: var(--cyan);
+  padding-bottom: 7px; margin-bottom: 5px;
+  border-bottom: 1px solid var(--border);
+}
+.layer-row {
+  display: flex; align-items: center; gap: 8px;
+  padding: 6px 7px; border-radius: 8px; cursor: pointer;
+  transition: background .18s; user-select: none;
+}
+.layer-row:hover { background: rgba(0,242,254,.06); }
+.layer-row input {
+  accent-color: #00F2FE; width: 13px; height: 13px; cursor: pointer;
+  flex-shrink: 0;
+}
+.layer-ico { font-size: 12px; width: 16px; text-align: center; }
+.layer-name { flex: 1; font-size: 11px; font-weight: 600; color: var(--text-mut); }
+.layer-row[data-on="true"] .layer-name { color: var(--text); }
+.layer-tick {
+  font-size: 8px; font-weight: 800; letter-spacing: 1px;
+  color: var(--text-dim);
+  padding: 2px 6px; border-radius: 999px;
+  background: rgba(139,155,180,.08); border: 1px solid var(--border);
+}
+.layer-row[data-on="true"] .layer-tick {
+  color: var(--cyan); border-color: rgba(0,242,254,.35); background: rgba(0,242,254,.07);
+}
+.layers-pop-foot {
+  margin-top: 7px; padding-top: 7px;
+  border-top: 1px solid var(--border);
+  font-size: 8.5px; line-height: 1.5; color: var(--text-dim); letter-spacing: .3px;
+}
+
+/* heart raycast hover badge accent (independent of label toggle) */
+.an-badge[data-circuit="myo"]     { border-color: rgba(255,110,110,.45); }
+.an-badge[data-circuit="chamber"] { border-color: rgba(171,71,188,.40); }
+.an-badge[data-circuit="valve"]   { border-color: rgba(255,220,180,.45); }
+.an-badge[data-circuit="sac"]     { border-color: rgba(124,212,255,.45); }
+.heart-hover-badge { min-width: 168px; }
 

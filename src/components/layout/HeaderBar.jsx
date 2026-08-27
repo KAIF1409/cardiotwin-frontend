@@ -19,7 +19,7 @@ const CONN_META = {
   offline:     { label: 'OFFLINE',    tone: 'off',     tip: 'Backend unreachable — running local physics model' },
 }
 
-export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
+export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP, fullscreenOn, onToggleFullscreen }) {
   const [conn, setConn]       = useState('connecting')
   const [meter, setMeter]     = useState({ bpm: 75, phase: 0, ef: 60 })
 
@@ -91,6 +91,16 @@ export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
             🎓 Education
           </button>
         </div>
+
+        {/* Immersive fullscreen — hides chrome, expands canvas to 100vw×100vh */}
+        <button
+          className={`fs-btn ${fullscreenOn ? 'active' : ''}`}
+          onClick={onToggleFullscreen}
+          title={fullscreenOn ? 'Exit fullscreen' : 'Immersive fullscreen (Esc to exit)'}
+          aria-label="Toggle immersive fullscreen"
+        >
+          {fullscreenOn ? '⤡' : '⛶'} Fullscreen
+        </button>
       </div>
     </header>
   )

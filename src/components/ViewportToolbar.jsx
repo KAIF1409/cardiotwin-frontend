@@ -2,10 +2,23 @@
  * ViewportToolbar.jsx — floating minimal glass toolbar on the 3D stage
  * ─────────────────────────────────────────────────────────────────────
  * Zoom ± · Reset camera · Slicing plane toggle · Strain heatmap toggle ·
- * Blood-flow particles toggle · Anatomical focus chips (LV RV LA RA AO).
+ * Blood-flow particles toggle · 🏷️ ON-DEMAND LABELS (default OFF) ·
+ * Deep-anatomy LAYERS popover · Anatomical focus chips (LV RV LA RA AO).
  * All actions are imperative (camera refs / engine flags) — no re-render
  * of the Canvas tree.
  */
+
+import { useEffect, useRef, useState } from 'react'
+
+const LAYER_ITEMS = [
+  { key: 'skeleton',    label: 'Skeleton',    icon: '🦴' },
+  { key: 'pericardium', label: 'Pericardium', icon: '🫧' },
+  { key: 'myocardium',  label: 'Myocardium',  icon: '🫀' },
+  { key: 'chambers',    label: 'Chambers',    icon: '🫁' },
+  { key: 'valves',      label: 'Valves',      icon: '✳️' },
+  { key: 'arteries',    label: 'Arteries',    icon: '🔴' },
+  { key: 'veins',       label: 'Veins',       icon: '🔵' },
+]
 
 export default function ViewportToolbar({
   onZoomIn, onZoomOut, onResetView,
@@ -13,8 +26,23 @@ export default function ViewportToolbar({
   strainActive, onToggleStrain,
   flowOn, onToggleFlow,
   thoraxOn, onToggleThorax,
+  labelsOn = false, onToggleLabels,
+  layers = {}, onSetLayer,
   focusTargets, onFocus, activeFocus,
 }) {
+  const [layersOpen, setLayersOpen] = useState(false)
+  const popRef = useRef(null)
+
+  // click-outside closes the layers popover
+  useEffect(() => {
+    if (!layersOpen) return
+    const onDown = e => {
+      if (popRef.current && !popRef.current.contains(e.target)) setLayersOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    return () => window.removeEventListener('pointerdown', onDown)
+  }, [layersOpen])
+
   return (
     <div className="viewport-toolbar">
       <div className="vt-group" role="group" aria-label="Camera controls">
@@ -70,6 +98,48 @@ export default function ViewportToolbar({
             <path d="M10 5v13m4-13v13" strokeLinecap="round"/>
           </svg>
         </button>
+
+        {/* ── ON-DEMAND LABELS — default OFF; click to fade badges in/out ── */}
+        <button
+          className={`vt-btn vt-labels ${labelsOn ? 'active' : ''}`}
+          onClick={onToggleLabels}
+          title={labelsOn ? 'Hide anatomical labels' : 'Show anatomical labels'}
+          aria-pressed={labelsOn}
+        >
+          🏷️<span className="vt-btn-txt">Labels</span>
+        </button>
+
+        {/* ── DEEP ANATOMY LAYERS popover ── */}
+        <div className="vt-layers-wrap" ref={popRef}>
+          <button
+            className={`vt-btn ${layersOpen ? 'active' : ''}`}
+            onClick={() => setLayersOpen(o => !o)}
+            title="Anatomical layer isolation"
+            aria-expanded={layersOpen}
+          >
+            ⚗️<span className="vt-btn-txt">Layers</span>
+          </button>
+          {layersOpen && (
+            <div className="layers-pop glass-pop">
+              <div className="layers-pop-head">ANATOMICAL LAYERS</div>
+              {LAYER_ITEMS.map(item => (
+                <label key={item.key} className="layer-row" data-on={!!layers[item.key]}>
+                  <input
+                    type="checkbox"
+                    checked={!!layers[item.key]}
+                    onChange={() => onSetLayer?.(item.key)}
+                  />
+                  <span className="layer-ico">{item.icon}</span>
+                  <span className="layer-name">{item.label}</span>
+                  <span className="layer-tick">{layers[item.key] ? 'ON' : 'OFF'}</span>
+                </label>
+              ))}
+              <div className="layers-pop-foot">
+                Inner chambers auto-clear the myocardial wall
+              </div>
+            </div>
+          )}
+        </div>
       </div>
 
       <div className="vt-divider" />

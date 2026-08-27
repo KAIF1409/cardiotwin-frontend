@@ -43,62 +43,77 @@ export default function ControlDock({
   activePresetLabel, onPreset,
   onSelectPatient, currentPatient,
   slice, // {sliceY,setSliceY,sliceAxis,setSliceAxis,sliceMode,setSliceMode,sweeping,setSweeping,sweepSpeed,setSweepSpeed}
+  collapsed = false,
+  onToggleCollapse,
 }) {
   const [open, setOpen] = useState({ patient: true, hemo: true, presets: true, slice: false })
   const toggle = k => setOpen(o => ({ ...o, [k]: !o[k] }))
 
   return (
-    <aside className="control-dock">
-      <div className="dock-scroll">
-        <Accordion id="patient" icon="👤" title="Patient" open={open.patient} onToggle={() => toggle('patient')}>
-          <PatientSelector onSelectPatient={onSelectPatient} currentPatient={currentPatient} />
-          <div className="slider-row" style={{ marginTop: 10 }}>
-            <label className="slider-label" htmlFor="hr-slider">
-              <span title="Beats per minute — drives every animation">❤️ Heart Rate</span>
-              <span className="slider-value">{heartRate}<small> bpm</small></span>
-            </label>
-            <input
-              id="hr-slider"
-              className="glass-range"
-              type="range" min="40" max="180" step="1"
-              value={heartRate}
-              onChange={e => setHeartRate(Number(e.target.value))}
-              style={{ '--fill': `${((heartRate - 40) / 140) * 100}%` }}
-            />
-          </div>
-        </Accordion>
+    <aside className={`control-dock ${collapsed ? 'slid' : ''}`}>
+      {/* Drawer handle strip — slides the whole dock off-screen */}
+      <div className="panel-strip">
+        <span className="panel-strip-label">CONTROLS</span>
+        <button
+          className="strip-btn"
+          onClick={onToggleCollapse}
+          title="Slide panel away (fullscreen canvas)"
+          aria-label="Collapse control dock"
+        >◀</button>
+      </div>
 
-        <Accordion id="hemo" icon="🎚️" title="Hemodynamics" open={open.hemo} onToggle={() => toggle('hemo')}
-          badge={activePresetLabel ? undefined : 'custom'}>
-          <p className="dock-hint" style={{ marginTop: 0 }}>
-            Every slider rescales the mesh, ECG sweep, PV loop & strain together.
-          </p>
-          {PARAM_META.map(({ key, icon, min, max, step, unit, tip }) => (
-            <div className="slider-row" key={key}>
-              <label className="slider-label" htmlFor={`sl-${key}`}>
-                <span title={tip}>{icon} {key.replace(' %', '')}</span>
-                <span className="slider-value">{params[key] ?? 50}<small>{unit}</small></span>
+      <div className="dock-inner">
+        <div className="dock-scroll">
+          <Accordion id="patient" icon="👤" title="Patient" open={open.patient} onToggle={() => toggle('patient')}>
+            <PatientSelector onSelectPatient={onSelectPatient} currentPatient={currentPatient} />
+            <div className="slider-row" style={{ marginTop: 10 }}>
+              <label className="slider-label" htmlFor="hr-slider">
+                <span title="Beats per minute — drives every animation">❤️ Heart Rate</span>
+                <span className="slider-value">{heartRate}<small> bpm</small></span>
               </label>
               <input
-                id={`sl-${key}`}
+                id="hr-slider"
                 className="glass-range"
-                data-param={key}
-                type="range" min={min} max={max} step={step}
-                value={params[key] ?? 50}
-                onChange={e => onSlider(key, Number(e.target.value))}
-                style={{ '--fill': `${(((params[key] ?? 50) - min) / (max - min)) * 100}%` }}
+                type="range" min="40" max="180" step="1"
+                value={heartRate}
+                onChange={e => setHeartRate(Number(e.target.value))}
+                style={{ '--fill': `${((heartRate - 40) / 140) * 100}%` }}
               />
             </div>
-          ))}
-        </Accordion>
+          </Accordion>
 
-        <Accordion id="presets" icon="🫀" title="Disease Presets" open={open.presets} onToggle={() => toggle('presets')}>
-          <DiseasePresets onSelect={onPreset} active={activePresetLabel} />
-        </Accordion>
+          <Accordion id="hemo" icon="🎚️" title="Hemodynamics" open={open.hemo} onToggle={() => toggle('hemo')}
+            badge={activePresetLabel ? undefined : 'custom'}>
+            <p className="dock-hint" style={{ marginTop: 0 }}>
+              Every slider rescales the mesh, ECG sweep, PV loop & strain together.
+            </p>
+            {PARAM_META.map(({ key, icon, min, max, step, unit, tip }) => (
+              <div className="slider-row" key={key}>
+                <label className="slider-label" htmlFor={`sl-${key}`}>
+                  <span title={tip}>{icon} {key.replace(' %', '')}</span>
+                  <span className="slider-value">{params[key] ?? 50}<small>{unit}</small></span>
+                </label>
+                <input
+                  id={`sl-${key}`}
+                  className="glass-range"
+                  data-param={key}
+                  type="range" min={min} max={max} step={step}
+                  value={params[key] ?? 50}
+                  onChange={e => onSlider(key, Number(e.target.value))}
+                  style={{ '--fill': `${(((params[key] ?? 50) - min) / (max - min)) * 100}%` }}
+                />
+              </div>
+            ))}
+          </Accordion>
 
-        <Accordion id="slice" icon="✂️" title="Slice / MRI Sweep" open={open.slice} onToggle={() => toggle('slice')}>
-          <SliceControls {...slice} />
-        </Accordion>
+          <Accordion id="presets" icon="🫀" title="Disease Presets" open={open.presets} onToggle={() => toggle('presets')}>
+            <DiseasePresets onSelect={onPreset} active={activePresetLabel} />
+          </Accordion>
+
+          <Accordion id="slice" icon="✂️" title="Slice / MRI Sweep" open={open.slice} onToggle={() => toggle('slice')}>
+            <SliceControls {...slice} />
+          </Accordion>
+        </div>
       </div>
     </aside>
   )
