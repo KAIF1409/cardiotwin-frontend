@@ -88,10 +88,13 @@ const _toCam       = new THREE.Vector3()
 const _normalMat   = new THREE.Matrix3()
 
 // ─── 3D PROJECTOR ─────────────────────────────────────────────────────────────
-export function HeartLabels3D({ onProjected, heartGroupRef }) {
+// `enabled` (default FALSE) — spec: labels are hidden until the user flips the
+// 🏷️ Labels toggle. While disabled the projector early-outs, costing nothing.
+export function HeartLabels3D({ onProjected, heartGroupRef, enabled = false }) {
   const { camera, size } = useThree()
 
   useFrame(() => {
+    if (!enabled) return
     const heart = heartGroupRef?.current
     if (!heart) return
 
@@ -159,7 +162,7 @@ export function HeartLabelsHTML({
   const efBg    = efVal >= 55 ? '#1b5e20'  : efVal >= 40 ? '#e65100'   : '#b71c1c'
 
   return (
-    <div style={{
+    <div className="labels-layer on" style={{
       position: 'absolute',
       inset: 0,
       pointerEvents: 'none',
@@ -331,7 +334,7 @@ export function HeartLabelsHTML({
         pointerEvents: 'none', whiteSpace: 'nowrap',
         letterSpacing: '0.3px',
       }}>
-        Click labels to explore · Drag to rotate · Scroll to zoom
+        Hover anatomy for details · Drag to rotate · Scroll to zoom
       </div>
 
       {/* ── Pulse animation ── */}

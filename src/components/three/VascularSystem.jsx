@@ -124,12 +124,16 @@ function Vessel({ p }) {
   )
 }
 
-export default function VascularSystem() {
+export default function VascularSystem({ layers = {} }) {
+  const { arteries = true, veins = true } = layers
   return (
     <group>
-      {Object.values(PATHS).filter(p => !p.flowOnly).map(p => (
-        <Vessel key={p.id} p={p} />
-      ))}
+      {Object.values(PATHS)
+        .filter(p => !p.flowOnly)
+        .filter(p => (p.layer === 'veins' ? veins : arteries))
+        .map(p => (
+          <Vessel key={p.id} p={p} />
+        ))}
     </group>
   )
 }

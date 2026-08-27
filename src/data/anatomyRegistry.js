@@ -264,6 +264,69 @@ Object.entries(PATHS).forEach(([key, p]) => {
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
+// DEEP ANATOMICAL LAYERS  (Phase-1 enterprise refactor)
+// ─────────────────────────────────────────────────────────────────────────────
+// Every path is tagged so the layer system can isolate arteries / veins /
+// flow channels dynamically. `CARDIAC_RIG` defines how the whole cardiac
+// block (heart mesh + vessels + valves + pericardium + flow) is scaled and
+// seated INSIDE the thoracic cage with real anatomical proportions:
+//
+//   • Real heart ≈ 12 cm tall in a ~30 cm ribcage  ⇒  scale ≈ 0.55–0.62
+//   • Seated left-of-midline, anterior against the sternum, base at T4-T5
+//
+// Focus markers and label anchors are expressed in UNSCALED cardiac space;
+// `App.focusOn` maps them through CARDIAC_RIG before driving the camera.
+// ═════════════════════════════════════════════════════════════════════════════
+const LAYER_OF_PATH = {
+  AORTA:    'arteries', COR_LAD: 'arteries', COR_DIA: 'arteries', COR_RCA: 'arteries',
+  PA_TRUNK: 'arteries', PA_LEFT: 'arteries', PA_RIGHT:'arteries',
+  SVC:      'veins',    IVC:     'veins',
+  PV_L:     'veins',    PV_R:    'veins',
+  CH_RA_RV: 'flow',     CH_LA_LV:'flow',
+}
+Object.entries(PATHS).forEach(([key, p]) => {
+  p.layer = LAYER_OF_PATH[key] ?? 'arteries'
+})
+
+/** Filter the path table down to one anatomical layer. */
+export const pathsByLayer = layer =>
+  Object.values(PATHS).filter(p => (p.layer ?? 'arteries') === layer)
+
+/** Anatomical rig: transform applied to the entire cardiac block. */
+export const CARDIAC_RIG = {
+  pos:   [-0.17, 0.06, 0.09],   // left-of-midline, slight anterior seat
+  scale: 0.60,                  // heart ≈ 40% of cage height (true proportion)
+}
+
+/** Procedural valve annuli — generated when GLB assets lack them. */
+export const VALVE_DEFS = [
+  {
+    id: 'MITRAL_V', fullName: 'Mitral (Bicuspid) Valve',
+    pos: [-0.235, 0.10, -0.02], normal: [-0.28, 0.45, 0.85], R: 0.185,
+    color: '#f8bbd0', kind: 'av',
+    info: 'Two leaflets guarding the LA → LV orifice; opens during diastole, slams shut at QRS ("lub").',
+  },
+  {
+    id: 'TRIC_V', fullName: 'Tricuspid Valve',
+    pos: [0.26, 0.12, 0.05], normal: [0.42, 0.40, 0.80], R: 0.205,
+    color: '#ffe0b2', kind: 'av',
+    info: 'Three leaflets between RA and RV — the largest valve orifice; anchors to papillary muscles.',
+  },
+  {
+    id: 'AORT_V', fullName: 'Aortic Valve',
+    pos: [0.00, 0.34, 0.10], normal: [0.0, 0.65, 0.76], R: 0.135,
+    color: '#ffcdd2', kind: 'semilunar',
+    info: 'Three semilunar cusps at the LVOT — closes at the dicrotic notch ("dup"), giving coronary perfusion.',
+  },
+  {
+    id: 'PULM_V', fullName: 'Pulmonary Valve',
+    pos: [0.17, 0.36, 0.16], normal: [0.30, 0.62, 0.72], R: 0.135,
+    color: '#e1f5fe', kind: 'semilunar',
+    info: 'RV outflow guard — directs deoxygenated blood into the pulmonary trunk during systole.',
+  },
+]
+
+// ═════════════════════════════════════════════════════════════════════════════
 // CAMERA-FOCUS MARKERS  (chips / click targets — mirrors ANATOMY_MARKERS shape)
 // ═════════════════════════════════════════════════════════════════════════════
 function markerFromPath(p) {
