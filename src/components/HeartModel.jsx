@@ -17,7 +17,6 @@
 
 import { useRef, useEffect, useMemo, Suspense } from 'react'
 import { useGLTF } from '@react-three/drei'
-import { useFrame } from '@react-three/fiber'
 import * as THREE from 'three'
 import { onEngineFrame } from '../simulation/cardiacEngine'
 
@@ -37,9 +36,12 @@ export function applyTissueMaterial(scene, { opacity = 1, color } = {}) {
 
     const mat = new THREE.MeshPhysicalMaterial({
       color: color ?? TISSUE.base,
-      roughness: 0.45,
+      roughness: 0.30,          // spec §1.2
       metalness: 0.02,
-      clearcoat: 0.55,
+      transmission: 0.10,       // spec §1.2 — living tissue translucency
+      thickness: 1.6,
+      ior: 1.38,
+      clearcoat: 0.50,          // spec §1.2
       clearcoatRoughness: 0.35,
       sheen: 0.6,
       sheenColor: new THREE.Color('#ff8a7a'),
@@ -62,6 +64,8 @@ export function applyTissueMaterial(scene, { opacity = 1, color } = {}) {
 
 function HeartMesh({ scene, baseScale, groupRef }) {
   const modelRef = useRef()
+  const innerRef = useRef()   // contraction target — so sibling vasculature
+                              // rendered in the same outer group NEVER squeezes
 
   // Clone scene safely once
   const clonedScene = useMemo(() => {
@@ -93,25 +97,25 @@ function HeartMesh({ scene, baseScale, groupRef }) {
     })
   }, [clonedScene])
 
-  // ── Master-clock contraction ──
+  // ── Master-clock contraction (inner group ONLY) ──
   useEffect(() => {
     return onEngineFrame(s => {
-      if (!groupRef?.current) return
+      if (!innerRef.current) return
       // contractLV: 0 (diastole) → ~1 (peak systole), dampened by infarct
       const k = s.contractLV
       // smooth pulse: scale dips inward during systole
       const pulse = baseScale * (1 - 0.14 * k)
-      groupRef.current.scale.setScalar(pulse)
+      innerRef.current.scale.setScalar(pulse)
       // subtle twist for realism (apex rotates slightly against base)
-      groupRef.current.rotation.z = -0.03 * k
+      innerRef.current.rotation.z = -0.03 * k
     })
-  }, [baseScale, groupRef])
+  }, [baseScale])
 
-  useFrame((_, delta) => {
-    if (modelRef.current) modelRef.current.rotation.y += delta * 0.05
-  })
-
-  return <primitive ref={modelRef} object={clonedScene} dispose={null} />
+  return (
+    <group ref={innerRef}>
+      <primitive ref={modelRef} object={clonedScene} dispose={null} />
+    </group>
+  )
 }
 
 
