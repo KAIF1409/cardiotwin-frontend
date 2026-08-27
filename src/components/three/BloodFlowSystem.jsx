@@ -69,6 +69,8 @@ function makeStreamData(count, sizeBase) {
 }
 
 const dummy = new THREE.Object3D()
+const _tangent = new THREE.Vector3()
+const _ZAXIS   = new THREE.Vector3(0, 0, 1)
 
 // ── One glowing stream along a chain curve (core + additive halo shell) ──────
 function FlowChain({ chain, color, circuit }) {
@@ -125,11 +127,17 @@ function FlowChain({ chain, color, circuit }) {
     const fade     = FLOW_STYLE.EDGE_FADE
     const pulseGlow = 0.65 + 0.6 * contract   // shared brightness term
 
+    // Velocity-proportional stretch — particles read as true flow VECTORS:
+    // faster HR / stronger ejection ⇒ longer blood streaks (spec Phase-4).
+    const stretch = visible ? 1 + 5.2 * Math.min(1.6, drive) : 1
+
     for (let i = 0; i < model.count; i++) {
       model.prog[i] = (model.prog[i] + delta * drive * model.speeds[i]) % 1
       const t = model.prog[i]
 
       model.curve.getPointAt(t, dummy.position)
+      model.curve.getTangentAt(t, _tangent)          // orientation → velocity
+      dummy.quaternion.setFromUnitVectors(_ZAXIS, _tangent)
 
       // Edge fade (heads/tails soften) — smoothstep in/out
       let edge = 1
@@ -144,11 +152,11 @@ function FlowChain({ chain, color, circuit }) {
                  (0.58 + 0.85 * contract) *
                  edge *
                  (focused ? 1.18 : 1)
-      dummy.scale.setScalar(visible ? sc : 0.0001)
+      dummy.scale.set(sc, sc, sc * stretch)          // elongate along tangent
       dummy.updateMatrix()
       core.setMatrixAt(i, dummy.matrix)
       if (haloRef.current) {
-        dummy.scale.setScalar(sc * 2.7)
+        dummy.scale.set(sc * 2.7, sc * 2.7, sc * 2.7 * (1 + stretch * 0.5))
         dummy.updateMatrix()
         haloRef.current.setMatrixAt(i, dummy.matrix)
       }
