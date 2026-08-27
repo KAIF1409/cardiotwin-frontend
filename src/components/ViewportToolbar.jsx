@@ -12,6 +12,7 @@ export default function ViewportToolbar({
   sliceActive, onToggleSlice,
   strainActive, onToggleStrain,
   flowOn, onToggleFlow,
+  thoraxOn, onToggleThorax,
   focusTargets, onFocus, activeFocus,
 }) {
   return (
@@ -56,6 +57,17 @@ export default function ViewportToolbar({
           <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
             <path d="M3 12h11M17 12l-3-3m3 3l-3 3" strokeLinecap="round" strokeLinejoin="round"/>
             <circle cx="20.5" cy="12" r="1.4" fill="currentColor" stroke="none"/>
+          </svg>
+        </button>
+        <button
+          className={`vt-btn ${thoraxOn ? 'active' : ''}`}
+          onClick={onToggleThorax}
+          title="Thoracic skeleton frame"
+        >
+          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
+            <path d="M6 4c-2 2.5-2.5 7-1.5 11S8 21 9 19s0-5-.5-8S7 5 6 4z" strokeLinejoin="round"/>
+            <path d="M18 4c2 2.5 2.5 7 1.5 11S16 21 15 19s0-5 .5-8S17 5 18 4z" strokeLinejoin="round"/>
+            <path d="M10 5v13m4-13v13" strokeLinecap="round"/>
           </svg>
         </button>
       </div>

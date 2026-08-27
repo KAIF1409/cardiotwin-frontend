@@ -1,13 +1,28 @@
-body {
+/* CardioTwin-X — global shell reset (loaded before App.css).
+   Guarantees the flex/grid shell never collapses before the themed
+   stylesheet parses. The Inter type-token is imported in App.css. */
+:root { --font-sans: 'Inter', 'Segoe UI', system-ui, -apple-system, BlinkMacSystemFont, sans-serif; }
+*, *::before, *::after { box-sizing: border-box; }
+
+html, body, #root {
+  height: 100%;
   margin: 0;
-  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Roboto', 'Oxygen',
-    'Ubuntu', 'Cantarell', 'Fira Sans', 'Droid Sans', 'Helvetica Neue',
-    sans-serif;
-  -webkit-font-smoothing: antialiased;
-  -moz-osx-font-smoothing: grayscale;
+  padding: 0;
 }
 
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
+    overflow: hidden;
+}
+
+/* base interactive polish — hover / active press / focus ring */
+button { font-family: var(--ff); }
+button:focus-visible { outline: 2px solid var(--cyan); outline-offset: 2px; }
+button:active { transform: scale(.96); }
+
 code {
-  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New',
-    monospace;
+  font-family: source-code-pro, Menlo, Monaco, Consolas, 'Courier New', monospace;
 }

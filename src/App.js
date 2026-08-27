@@ -26,11 +26,14 @@ import HeartModel from './components/HeartModel'
 import ChamberHeart from './components/ChamberHeart'
 import SlicedHeart from './components/SlicedHeart'
 import DeformableHeart from './components/DeformableHeart'
-import BloodFlowParticles from './components/BloodFlowParticles'
+import BloodFlowSystem from './components/three/BloodFlowSystem'
+import VascularSystem from './components/three/VascularSystem'
+import ThoraxFramework from './components/three/ThoraxFramework'
 import ViewportToolbar from './components/ViewportToolbar'
 import HeaderBar from './components/layout/HeaderBar'
 import ControlDock from './components/layout/ControlDock'
 import { HeartLabels3D, HeartLabelsHTML, ANATOMY_MARKERS } from './components/HeartLabels'
+import { VESSEL_MARKERS } from './data/anatomyRegistry'
 
 import EducationHub from './components/education/EducationHub'
 import LearningCard from './components/education/LearningCard'
@@ -82,6 +85,7 @@ export default function App() {
 
   // Stage extras
   const [showBloodFlow, setShowBloodFlow] = useState(true)
+  const [showThorax, setShowThorax]       = useState(true)
   const [activeFocus, setActiveFocus] = useState(null)
   const cameraRef = useRef(null)
   const heartGroupRef = useRef()
@@ -259,10 +263,13 @@ export default function App() {
     cameraRef.current?.setLookAt(0, 0, 5, 0, 0, 0, true)
   }
 
-  // Education modules request camera focus via this bus event
+  // Education modules & 3-D scene requests camera focus via this bus event
+  // (detail = ANATOMY_MARKERS id · vascular registry id · thorax bone id)
   useEffect(() => {
     const handler = e => {
-      const marker = ANATOMY_MARKERS.find(m => m.id === e.detail)
+      const marker =
+        ANATOMY_MARKERS.find(m => m.id === e.detail) ||
+        VESSEL_MARKERS.find(m => m.id === e.detail)
       if (marker) focusOn(marker)
     }
     window.addEventListener('ct:focus-marker', handler)
@@ -342,7 +349,9 @@ export default function App() {
             onToggleStrain={toggleStrainView}
             flowOn={showBloodFlow}
             onToggleFlow={() => setShowBloodFlow(f => !f)}
-            focusTargets={ANATOMY_MARKERS}
+            thoraxOn={showThorax}
+            onToggleThorax={() => setShowThorax(t => !t)}
+            focusTargets={[...ANATOMY_MARKERS, ...VESSEL_MARKERS]}
             onFocus={focusOn}
             activeFocus={activeFocus}
           />
@@ -354,12 +363,17 @@ export default function App() {
               camera={{ position: [0, 0, 5], fov: 45, near: 0.1, far: 100 }}
               gl={{ antialias: true, powerPreference: 'high-performance' }}
             >
-              {/* ── Clinical lighting rig (3-point + subsurface rims) ── */}
-              <ambientLight intensity={0.38} color="#b8c6e0" />
-              <directionalLight position={[4, 5, 6]} intensity={1.35} color="#eaf4ff" />
-              <pointLight position={[-5, -2, -4]} intensity={14} distance={14} color="#ff5a7a" />
-              <pointLight position={[0, 3, -6]}  intensity={18} distance={16} color="#00F2FE" />
-              <pointLight position={[3, -4, 2]}  intensity={8}  distance={10} color="#2563EB" />
+              {/* ── Cinematic clinical lighting rig ──────────────────────────
+                  Key + fill + dual rim (cyan/crimson) + under-glow, tuned
+                  for MeshPhysicalMaterial SSS-style tissue response */}
+              <ambientLight intensity={0.34} color="#b8c6e0" />
+              <directionalLight position={[4, 6, 7]} intensity={1.55} color="#eaf4ff" />
+              <directionalLight position={[-6, -3, -5]} intensity={0.45} color="#8fb0ff" />
+              <pointLight position={[-5, -2, -4]} intensity={16} distance={14} color="#FF2E93" />
+              <pointLight position={[0, 3.5, -6]} intensity={20} distance={16} color="#00F2FE" />
+              <pointLight position={[3, -4, 2]}  intensity={9}  distance={10} color="#0055FF" />
+              <spotLight position={[0, 7, 4]} angle={0.5} penumbra={0.85}
+                         intensity={26} distance={18} color="#fff4ea" />
 
               {/* 3-D projector MUST live inside the Canvas — it drives the
                   HTML label overlay positions via onProjected */}
@@ -370,6 +384,17 @@ export default function App() {
 
               {/* ── Heart model per view mode ── */}
               <group ref={heartGroupRef}>
+                {/* Thoracic skeleton frame — anatomical scale context (full view) */}
+                {viewMode === 'full' && (
+                  <ThoraxFramework visible={showThorax} />
+                )}
+
+                {/* Complete vascular tree — interactive tubes sharing the
+                    registry curves that drive the blood-flow particles */}
+                {(viewMode === 'full' || viewMode === 'deform') && (
+                  <VascularSystem />
+                )}
+
                 {viewMode === 'full' && (
                   <HeartModel
                     baseScale={activeBaseScale}
@@ -411,7 +436,7 @@ export default function App() {
                 )}
 
                 {showBloodFlow && viewMode !== 'slice' && (
-                  <BloodFlowParticles infarct={activeInfarct} />
+                  <BloodFlowSystem />
                 )}
               </group>
 
