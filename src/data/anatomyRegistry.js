@@ -23,12 +23,26 @@ import * as THREE from 'three'
 const V = pts => pts.map(([x, y, z]) => new THREE.Vector3(x, y, z))
 
 const _curveCache = new Map()
-/** Arc-length parameterised curve for a path id (cached, zero realloc). */
-export function getPathCurve(id) {
-  let c = _curveCache.get(id)
+
+/**
+ * Resolve a path by EITHER its registry key ('PA_TRUNK', 'AORTA', …)
+ * OR its public flow id ('PAT', 'AO', 'LAD', …). Both naming styles are
+ * used across the app, so both must resolve — an unknown id is a hard,
+ * loud error instead of a cryptic ".pts of undefined" crash downstream.
+ */
+const PATH_BY_ID = {}
+
+/** Arc-length parameterised curve for a path key-or-id (cached). */
+export function getPathCurve(keyOrId) {
+  const k = String(keyOrId)
+  let c = _curveCache.get(k)
   if (!c) {
-    c = new THREE.CatmullRomCurve3(PATHS[id].pts, false, 'centripetal')
-    _curveCache.set(id, c)
+    const p = PATH_BY_ID[k] ?? PATHS[k]
+    if (!p || !p.pts) {
+      throw new Error(`anatomyRegistry: unknown vessel path "${keyOrId}"`)
+    }
+    c = new THREE.CatmullRomCurve3(p.pts, false, 'centripetal')
+    _curveCache.set(k, c)
   }
   return c
 }
@@ -240,12 +254,13 @@ export const JOURNEYS = {
   pulmonary: ['SVC', 'IVC', 'TRIC', 'PAT', 'PAL', 'PAR'],
 }
 
-// Populate the hover-id → circuit lookup NOW that PATHS exists.
-// Keys are upper-cased path ids (AO · PAT · LAD …) plus uppercase registry
-// keys so both naming styles resolve from anywhere in the app.
-Object.values(PATHS).forEach(p => {
-  CIRCUIT_OF_ID[p.id.toUpperCase()]       = p.circuit
-  CIRCUIT_OF_ID[String(p.id).toUpperCase()] = p.circuit
+// Populate lookups NOW that PATHS exists.
+//   PATH_BY_ID     → curve resolution by registry key OR public flow id
+//   CIRCUIT_OF_ID  → hover-id → circuit mapping for the flow highlight bus
+Object.entries(PATHS).forEach(([key, p]) => {
+  PATH_BY_ID[key] = p
+  PATH_BY_ID[p.id] = p
+  CIRCUIT_OF_ID[p.id.toUpperCase()] = p.circuit
 })
 
 // ═════════════════════════════════════════════════════════════════════════════
