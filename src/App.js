@@ -40,6 +40,7 @@ import LearningCard from './components/education/LearningCard'
 import CauseEffectPopup from './components/education/CauseEffectPopup'
 import { PericardiumSac, InnerChambers, ValveSet } from './components/three/CardiacLayers'
 import ConductionSystem from './components/three/ConductionSystem'
+import heartSounds from './services/heartSounds'
 
 import useHeartData from './hooks/useHeartData'
 import useIsMobile from './hooks/useIsMobile'
@@ -104,6 +105,10 @@ export default function App() {
 
   // ── On-demand labels — DEFAULT OFF per spec §1.2 ──
   const [showLabels, setShowLabels] = useState(false)
+
+  // ── Auscultation — synthesized heart sounds, off by default ──
+  const [soundOn, setSoundOn] = useState(false)
+  useEffect(() => { heartSounds.setEnabled(soundOn) }, [soundOn])
 
   // ── Deep anatomical layers (Phase-1 enterprise engine) ──
   const [layers, setLayers] = useState({
@@ -468,6 +473,8 @@ export default function App() {
             onToggleThorax={() => setShowThorax(t => !t)}
             labelsOn={showLabels}
             onToggleLabels={() => setShowLabels(v => !v)}
+            soundOn={soundOn}
+            onToggleSound={() => setSoundOn(v => !v)}
             layers={layers}
             onSetLayer={toggleLayer}
             focusTargets={[...ANATOMY_MARKERS, ...VESSEL_MARKERS]}
@@ -667,6 +674,11 @@ export default function App() {
             </svg>
           </button>
           <i className="id-sep" />
+          <button
+            className={`id-btn ${soundOn ? 'on' : ''}`}
+            onClick={() => setSoundOn(v => !v)}
+            title="Heart sounds"
+          >🔊</button>
           <button
             className={`id-btn ${showLabels ? 'on' : ''}`}
             onClick={() => setShowLabels(v => !v)}

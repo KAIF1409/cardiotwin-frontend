@@ -1115,6 +1115,13 @@ button.primary:hover:not(:disabled) { filter: brightness(1.12); }
 .an-badge[data-circuit="conduction"] { border-color: rgba(16,185,129,.45); }
 .heart-hover-badge { min-width: 168px; }
 
+/* auscultation button — breathing ring while listening */
+.vt-btn.sound-on, .id-btn.sound-on { animation: soundBreath 1.1s ease-in-out infinite; }
+@keyframes soundBreath {
+  0%, 100% { box-shadow: 0 0 10px -4px rgba(16,185,129,.55); }
+  50%      { box-shadow: 0 0 20px -2px rgba(16,185,129,.85); }
+}
+
 /* ═══════════════════════════════════════════════════════════════════
    MOBILE COMPATIBILITY LAYER  ·  ≤900 px single-column shell
    ═══════════════════════════════════════════════════════════════════ */

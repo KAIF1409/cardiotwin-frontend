@@ -28,6 +28,7 @@ export default function ViewportToolbar({
   flowOn, onToggleFlow,
   thoraxOn, onToggleThorax,
   labelsOn = false, onToggleLabels,
+  soundOn = false, onToggleSound,
   layers = {}, onSetLayer,
   focusTargets, onFocus, activeFocus,
 }) {
@@ -98,6 +99,16 @@ export default function ViewportToolbar({
             <path d="M18 4c2 2.5 2.5 7 1.5 11S16 21 15 19s0-5 .5-8S17 5 18 4z" strokeLinejoin="round"/>
             <path d="M10 5v13m4-13v13" strokeLinecap="round"/>
           </svg>
+        </button>
+
+        {/* ── AUSCULTATION — synthesized S1/S2 (+S3/S4/murmur when pathological) ── */}
+        <button
+          className={`vt-btn vt-sound ${soundOn ? 'active sound-on' : ''}`}
+          onClick={onToggleSound}
+          title={soundOn ? 'Mute heart sounds' : 'Listen to heart sounds (S1·S2 — murmurs when valves narrow)'}
+          aria-pressed={soundOn}
+        >
+          🔊
         </button>
 
         {/* ── ON-DEMAND LABELS — default OFF; click to fade badges in/out ── */}
