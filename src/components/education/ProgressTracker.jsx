@@ -1,44 +1,45 @@
+import { X as XIcon } from 'lucide-react'
 const ACHIEVEMENTS = [
   {
     id: 'first_slider',
-    label: '🎚️ First Steps',
-    desc: 'Moved a slider for the first time',
+    label: 'First Steps',
+    desc: 'Moved a slider for the first time'
   },
   {
     id: 'heart_failure',
-    label: '❤️‍🩹 Heart Failure',
-    desc: 'Simulated heart failure state',
+    label: 'Heart Failure',
+    desc: 'Simulated heart failure state'
   },
   {
     id: 'athlete',
-    label: '⚡ Athlete Mode',
-    desc: 'Achieved athlete heart state',
+    label: 'Athlete Mode',
+    desc: 'Achieved athlete heart state'
   },
   {
     id: 'mi',
-    label: '🔴 MI Survivor',
-    desc: 'Simulated myocardial infarction',
+    label: 'MI Survivor',
+    desc: 'Simulated myocardial infarction'
   },
   {
     id: 'chamber_explorer',
-    label: '🔬 Chamber Explorer',
-    desc: 'Explored all 4 chambers',
+    label: 'Chamber Explorer',
+    desc: 'Explored all 4 chambers'
   },
   {
     id: 'slice_master',
-    label: '✂️ Slice Master',
-    desc: 'Used the slice feature',
+    label: 'Slice Master',
+    desc: 'Used the slice feature'
   },
   {
     id: 'strain_viewer',
-    label: '🧬 Strain Viewer',
-    desc: 'Viewed strain heatmap',
+    label: 'Strain Viewer',
+    desc: 'Viewed strain heatmap'
   },
   {
     id: 'guided_complete',
-    label: '📚 Tour Complete',
-    desc: 'Completed guided learning tour',
-  },
+    label: 'Tour Complete',
+    desc: 'Completed guided learning tour'
+  }
 ]
 
 export default function ProgressTracker({ unlocked = [], onClose }) {
@@ -57,7 +58,7 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
         width: '260px',
         zIndex: 1000,
         boxShadow: '0 0 24px #ab47bc44',
-        animation: 'slideInRight 0.3s ease',
+        animation: 'slideInRight 0.3s ease'
       }}
     >
       {/* Header */}
@@ -66,19 +67,18 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '10px',
+          marginBottom: '10px'
         }}
       >
         <h3
           style={{
             color: '#ab47bc',
             margin: 0,
-            fontSize: '13px',
+            fontSize: '13px'
           }}
         >
-          🏆 Progress
+          Progress
         </h3>
-
         <button
           onClick={onClose}
           style={{
@@ -86,10 +86,10 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
             border: 'none',
             color: '#888',
             cursor: 'pointer',
-            fontSize: '16px',
+            fontSize: '16px'
           }}
         >
-          ✕
+          <XIcon size={14} strokeWidth={2} />
         </button>
       </div>
 
@@ -100,7 +100,7 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
           borderRadius: '4px',
           height: '6px',
           marginBottom: '4px',
-          overflow: 'hidden',
+          overflow: 'hidden'
         }}
       >
         <div
@@ -109,7 +109,7 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
             height: '6px',
             borderRadius: '4px',
             width: `${pct}%`,
-            transition: 'width 0.5s ease',
+            transition: 'width 0.5s ease'
           }}
         />
       </div>
@@ -119,14 +119,14 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
         style={{
           color: '#666',
           fontSize: '10px',
-          marginBottom: '12px',
+          marginBottom: '12px'
         }}
       >
         {unlocked.length} / {ACHIEVEMENTS.length} — {pct}%
       </p>
 
       {/* Achievement List */}
-      {ACHIEVEMENTS.map((a) => {
+      {ACHIEVEMENTS.map(a => {
         const isUnlocked = unlocked.includes(a.id)
 
         return (
@@ -138,29 +138,25 @@ export default function ProgressTracker({ unlocked = [], onClose }) {
               gap: '8px',
               marginBottom: '8px',
               opacity: isUnlocked ? 1 : 0.35,
-              transition: 'opacity 0.2s ease',
+              transition: 'opacity 0.2s ease'
             }}
           >
-            <span style={{ fontSize: '16px' }}>
-              {isUnlocked ? '✅' : '⬜'}
-            </span>
-
+            <span style={{ fontSize: '16px' }}>{isUnlocked ? '' : ''}</span>
             <div>
               <div
                 style={{
                   color: isUnlocked ? '#ccc' : '#555',
                   fontSize: '11px',
-                  fontWeight: 'bold',
+                  fontWeight: 'bold'
                 }}
               >
                 {a.label}
               </div>
-
               <div
                 style={{
                   color: '#666',
                   fontSize: '10px',
-                  lineHeight: '1.4',
+                  lineHeight: '1.4'
                 }}
               >
                 {a.desc}

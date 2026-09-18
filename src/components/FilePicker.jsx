@@ -1,9 +1,6 @@
 import { useRef, useEffect } from 'react'
 
-export default function FilePicker({
-  onFileLoaded,
-  currentModel,
-}) {
+export default function FilePicker({ onFileLoaded, currentModel }) {
   const currentUrlRef = useRef(null)
 
   useEffect(() => {
@@ -15,15 +12,13 @@ export default function FilePicker({
     }
   }, [])
 
-  const handleFile = (e) => {
+  const handleFile = e => {
     const file = e.target.files?.[0]
 
     if (!file) return
 
     // Validate extension
-    const isGLB =
-      file.name.toLowerCase().endsWith('.glb') ||
-      file.type === 'model/gltf-binary'
+    const isGLB = file.name.toLowerCase().endsWith('.glb') || file.type === 'model/gltf-binary'
 
     if (!isGLB) {
       alert('Please select a valid .glb file')
@@ -58,7 +53,7 @@ export default function FilePicker({
       style={{
         display: 'flex',
         flexDirection: 'column',
-        gap: '6px',
+        gap: '6px'
       }}
     >
       <h3
@@ -67,10 +62,10 @@ export default function FilePicker({
           fontSize: '11px',
           margin: 0,
           letterSpacing: '2px',
-          textTransform: 'uppercase',
+          textTransform: 'uppercase'
         }}
       >
-        🫀 Heart Model
+        Heart Model
       </h3>
 
       {/* Current model */}
@@ -80,14 +75,11 @@ export default function FilePicker({
           borderRadius: '6px',
           padding: '6px 8px',
           border: '1px solid #2a2a3e',
-          fontSize: '10px',
+          fontSize: '10px'
         }}
       >
         <span style={{ color: '#555' }}>Loaded: </span>
-
-        <span style={{ color: '#00e676' }}>
-          {currentModel || 'Default (heart.glb)'}
-        </span>
+        <span style={{ color: '#00e676' }}>{currentModel || 'Default (heart.glb)'}</span>
       </div>
 
       {/* Upload button */}
@@ -106,11 +98,10 @@ export default function FilePicker({
           cursor: 'pointer',
           fontWeight: 'bold',
           textAlign: 'center',
-          transition: '0.2s',
+          transition: '0.2s'
         }}
       >
-        📂 Browse GLB File
-
+        Browse GLB File
         <input
           type="file"
           accept=".glb,model/gltf-binary"
@@ -118,13 +109,12 @@ export default function FilePicker({
           style={{ display: 'none' }}
         />
       </label>
-
       <p
         style={{
           color: '#444',
           fontSize: '9px',
           textAlign: 'center',
-          margin: 0,
+          margin: 0
         }}
       >
         Only .glb files accepted

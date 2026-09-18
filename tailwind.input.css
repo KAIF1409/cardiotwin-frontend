@@ -1,0 +1,10 @@
+/**
+ * Tailwind v4 — CSS-first input.
+ * We import ONLY theme + utilities (NO preflight) so the app's existing
+ * custom glass design system in App.css is never reset by Tailwind resets.
+ * Sources are scanned from ./src — see the @source directive below.
+ */
+@import "tailwindcss/theme";
+@import "tailwindcss/utilities";
+
+@source "./src/**/*.{js,jsx}";

@@ -1,10 +1,4 @@
-import React, {
-  useRef,
-  useEffect,
-  useState,
-  Suspense,
-  Component,
-} from 'react'
+import React, { useRef, useEffect, useState, Suspense, Component } from 'react'
 
 import { useLoader } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
@@ -46,7 +40,7 @@ const CHAMBERS = [
 
     infarctSensitivity: 0.18,
 
-    useSphere: false,
+    useSphere: false
   },
 
   // RIGHT VENTRICLE
@@ -75,7 +69,7 @@ const CHAMBERS = [
 
     infarctSensitivity: 0.09,
 
-    useSphere: false,
+    useSphere: false
   },
 
   // MYOCARDIUM
@@ -104,7 +98,7 @@ const CHAMBERS = [
 
     infarctSensitivity: 0.22,
 
-    useSphere: false,
+    useSphere: false
   },
 
   // LEFT ATRIUM
@@ -119,7 +113,7 @@ const CHAMBERS = [
 
     sphereScale: [0.28, 0.28, 0.28],
 
-    spherePos: [-0.18, 0.30, -0.12],
+    spherePos: [-0.18, 0.3, -0.12],
 
     color: '#ab47bc',
 
@@ -129,7 +123,7 @@ const CHAMBERS = [
 
     baseStrain: -32.0,
 
-    infarctSensitivity: 0.05,
+    infarctSensitivity: 0.05
   },
 
   // RIGHT ATRIUM
@@ -144,7 +138,7 @@ const CHAMBERS = [
 
     sphereScale: [0.26, 0.26, 0.26],
 
-    spherePos: [0.20, 0.28, -0.08],
+    spherePos: [0.2, 0.28, -0.08],
 
     color: '#ef5350',
 
@@ -154,38 +148,26 @@ const CHAMBERS = [
 
     baseStrain: -29.5,
 
-    infarctSensitivity: 0.04,
-  },
+    infarctSensitivity: 0.04
+  }
 ]
 
 // ─────────────────────────────────────────────
 // STRAIN HELPERS
 // ─────────────────────────────────────────────
 
-function getChamberStrain(
-  chamber,
-  infarct
-) {
-  const raw =
-    chamber.baseStrain +
-    infarct *
-      chamber.infarctSensitivity
+function getChamberStrain(chamber, infarct) {
+  const raw = chamber.baseStrain + infarct * chamber.infarctSensitivity
 
-  return parseFloat(
-    Math.min(-0.5, raw).toFixed(1)
-  )
+  return parseFloat(Math.min(-0.5, raw).toFixed(1))
 }
 
-function getStrainColor(
-  strain,
-  fallback
-) {
+function getStrainColor(strain, fallback) {
   const abs = Math.abs(strain)
 
   if (abs >= 18) return fallback
 
-  if (abs >= 12)
-    return '#ff9800'
+  if (abs >= 12) return '#ff9800'
 
   return '#ef5350'
 }
@@ -194,25 +176,14 @@ function getStrainColor(
 // TOOLTIP
 // ─────────────────────────────────────────────
 
-function ChamberTooltip({
-  chamber,
-  strain,
-  yOffset,
-}) {
-  const col = getStrainColor(
-    strain,
-    chamber.hoverColor
-  )
+function ChamberTooltip({ chamber, strain, yOffset }) {
+  const col = getStrainColor(strain, chamber.hoverColor)
 
   return (
-    <Html
-      distanceFactor={6}
-      position={[0, yOffset, 0]}
-    >
+    <Html distanceFactor={6} position={[0, yOffset, 0]}>
       <div
         style={{
-          background:
-            'rgba(6,6,16,0.93)',
+          background: 'rgba(6,6,16,0.93)',
 
           color: col,
 
@@ -228,18 +199,17 @@ function ChamberTooltip({
 
           whiteSpace: 'nowrap',
 
-          pointerEvents: 'none',
+          pointerEvents: 'none'
         }}
       >
         {chamber.id} — {chamber.label}
-
         <div
           style={{
             fontSize: '10px',
 
             color: '#aaa',
 
-            marginTop: '3px',
+            marginTop: '3px'
           }}
         >
           Strain: {strain}%
@@ -253,126 +223,73 @@ function ChamberTooltip({
 // STL CHAMBER
 // ─────────────────────────────────────────────
 
-function STLChamber({
-  chamber,
-  isSelected,
-  isIsolated,
-  baseScale,
-  beatScale,
-  onSelect,
-  infarct,
-}) {
+function STLChamber({ chamber, isSelected, isIsolated, baseScale, beatScale, onSelect, infarct }) {
   // SAFE HOOK ORDER
-  const geometry = useLoader(
-    STLLoader,
-    chamber.stl
-  )
+  const geometry = useLoader(STLLoader, chamber.stl)
 
-  const [hovered, setHovered] =
-    useState(false)
+  const [hovered, setHovered] = useState(false)
 
   const processedRef = useRef(false)
 
   useEffect(() => {
-    if (
-      !geometry ||
-      processedRef.current
-    )
-      return
+    if (!geometry || processedRef.current) return
 
     geometry.computeBoundingBox()
 
-    const box =
-      geometry.boundingBox
+    const box = geometry.boundingBox
 
-    const center =
-      new THREE.Vector3()
+    const center = new THREE.Vector3()
 
     box.getCenter(center)
 
-    geometry.translate(
-      -center.x,
-      -center.y,
-      -center.z
-    )
+    geometry.translate(-center.x, -center.y, -center.z)
 
     geometry.computeVertexNormals()
 
     processedRef.current = true
   }, [geometry])
 
-  const strain = getChamberStrain(
-    chamber,
-    infarct
-  )
+  const strain = getChamberStrain(chamber, infarct)
 
-  const scale =
-    chamber.modelScale *
-    baseScale *
-    beatScale *
-    (isSelected ? 1.04 : 1)
+  const scale = chamber.modelScale * baseScale * beatScale * (isSelected ? 1.04 : 1)
 
-  const visible =
-    !isIsolated || isSelected
+  const visible = !isIsolated || isSelected
 
-  const color =
-    hovered || isSelected
-      ? getStrainColor(
-          strain,
-          chamber.hoverColor
-        )
-      : chamber.color
+  const color = hovered || isSelected ? getStrainColor(strain, chamber.hoverColor) : chamber.color
 
   if (!visible) return null
 
   return (
-    <group
-      position={chamber.position}
-      rotation={chamber.rotation}
-    >
+    <group position={chamber.position} rotation={chamber.rotation}>
       <mesh
         geometry={geometry}
         scale={[-scale, scale, scale]}
-        onClick={(e) => {
+        onClick={e => {
           e.stopPropagation()
 
           onSelect(chamber.id)
         }}
-        onPointerOver={(e) => {
+        onPointerOver={e => {
           e.stopPropagation()
 
           setHovered(true)
         }}
-        onPointerOut={() =>
-          setHovered(false)
-        }
+        onPointerOut={() => setHovered(false)}
       >
         <meshStandardMaterial
           color={color}
           transparent
-          opacity={
-            isSelected ? 0.95 : 0.82
-          }
+          opacity={isSelected ? 0.95 : 0.82}
           roughness={0.35}
           metalness={0.2}
           side={THREE.DoubleSide}
-          emissive={
-            isSelected
-              ? chamber.emissiveColor
-              : '#000000'
-          }
-          emissiveIntensity={
-            isSelected ? 0.28 : 0
-          }
+          emissive={isSelected ? chamber.emissiveColor : '#000000'}
+          emissiveIntensity={isSelected ? 0.28 : 0}
         />
       </mesh>
 
       {(hovered || isSelected) && (
-        <ChamberTooltip
-          chamber={chamber}
-          strain={strain}
-          yOffset={0.6}
-        />
+        <ChamberTooltip chamber={chamber} strain={strain} yOffset={0.6} />
       )}
     </group>
   )
@@ -389,64 +306,38 @@ function SphereChamber({
   baseScale,
   beatScale,
   onSelect,
-  infarct,
+  infarct
 }) {
-  const [hovered, setHovered] =
-    useState(false)
+  const [hovered, setHovered] = useState(false)
 
-  const visible =
-    !isIsolated || isSelected
+  const visible = !isIsolated || isSelected
 
   if (!visible) return null
 
-  const strain = getChamberStrain(
-    chamber,
-    infarct
-  )
+  const strain = getChamberStrain(chamber, infarct)
 
-  const [sx, sy, sz] =
-    chamber.sphereScale
+  const [sx, sy, sz] = chamber.sphereScale
 
   return (
     <group position={chamber.spherePos}>
       <mesh
-        scale={[
-          sx *
-            baseScale *
-            beatScale,
-
-          sy *
-            baseScale *
-            beatScale,
-
-          sz *
-            baseScale *
-            beatScale,
-        ]}
-        onClick={(e) => {
+        scale={[sx * baseScale * beatScale, sy * baseScale * beatScale, sz * baseScale * beatScale]}
+        onClick={e => {
           e.stopPropagation()
 
           onSelect(chamber.id)
         }}
-        onPointerOver={(e) => {
+        onPointerOver={e => {
           e.stopPropagation()
 
           setHovered(true)
         }}
-        onPointerOut={() =>
-          setHovered(false)
-        }
+        onPointerOut={() => setHovered(false)}
       >
-        <sphereGeometry
-          args={[1, 48, 48]}
-        />
+        <sphereGeometry args={[1, 48, 48]} />
 
         <meshStandardMaterial
-          color={
-            hovered || isSelected
-              ? chamber.hoverColor
-              : chamber.color
-          }
+          color={hovered || isSelected ? chamber.hoverColor : chamber.color}
           transparent
           opacity={0.88}
           roughness={0.4}
@@ -455,11 +346,7 @@ function SphereChamber({
       </mesh>
 
       {(hovered || isSelected) && (
-        <ChamberTooltip
-          chamber={chamber}
-          strain={strain}
-          yOffset={0.45}
-        />
+        <ChamberTooltip chamber={chamber} strain={strain} yOffset={0.45} />
       )}
     </group>
   )
@@ -474,30 +361,23 @@ class ChamberErrorBoundary extends Component {
     super(props)
 
     this.state = {
-      failed: false,
+      failed: false
     }
   }
 
   static getDerivedStateFromError() {
     return {
-      failed: true,
+      failed: true
     }
   }
 
   componentDidCatch(error) {
-    console.error(
-      'CHAMBER LOAD ERROR:',
-      error
-    )
+    console.error('CHAMBER LOAD ERROR:', error)
   }
 
   render() {
     if (this.state.failed) {
-      return (
-        <SphereChamber
-          {...this.props.chamberProps}
-        />
-      )
+      return <SphereChamber {...this.props.chamberProps} />
     }
 
     return this.props.children
@@ -511,19 +391,12 @@ class ChamberErrorBoundary extends Component {
 function SmartChamber(props) {
   const { chamber } = props
 
-  if (
-    chamber.useSphere ||
-    !chamber.stl
-  ) {
-    return (
-      <SphereChamber {...props} />
-    )
+  if (chamber.useSphere || !chamber.stl) {
+    return <SphereChamber {...props} />
   }
 
   return (
-    <ChamberErrorBoundary
-      chamberProps={props}
-    >
+    <ChamberErrorBoundary chamberProps={props}>
       <Suspense fallback={null}>
         <STLChamber {...props} />
       </Suspense>
@@ -538,13 +411,13 @@ function SmartChamber(props) {
 export default function ChamberHeart({
   baseScale = 1,
 
-  heartRate = 72,   // kept for API compat — the master engine owns timing
+  heartRate = 72, // kept for API compat — the master engine owns timing
 
   onSelectChamber,
 
   selectedChamber,
 
-  infarct = 0,
+  infarct = 0
 }) {
   // ── MASTER CLOCK FIX ──────────────────────────────────────────────
   // v1 mutated a ref inside useFrame and passed `beatScale.current` as a
@@ -565,33 +438,20 @@ export default function ChamberHeart({
     })
   }, [baseScale])
 
-  const handleSelect = (id) => {
+  const handleSelect = id => {
     if (!onSelectChamber) return
 
-    onSelectChamber(
-      selectedChamber === id
-        ? null
-        : id
-    )
+    onSelectChamber(selectedChamber === id ? null : id)
   }
 
   return (
-    <group
-      ref={pulseRef}
-      position={[0, -0.15, 0]}
-      rotation={[0.1, Math.PI, 0]}
-    >
-      {CHAMBERS.map((chamber) => (
+    <group ref={pulseRef} position={[0, -0.15, 0]} rotation={[0.1, Math.PI, 0]}>
+      {CHAMBERS.map(chamber => (
         <SmartChamber
           key={chamber.id}
           chamber={chamber}
-          isSelected={
-            selectedChamber ===
-            chamber.id
-          }
-          isIsolated={
-            selectedChamber !== null
-          }
+          isSelected={selectedChamber === chamber.id}
+          isIsolated={selectedChamber !== null}
           baseScale={baseScale}
           beatScale={1}
           onSelect={handleSelect}

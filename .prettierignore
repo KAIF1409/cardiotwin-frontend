@@ -1,0 +1,6 @@
+node_modules
+build
+public
+package-lock.json
+src/styles/tailwind.generated.css
+*.md

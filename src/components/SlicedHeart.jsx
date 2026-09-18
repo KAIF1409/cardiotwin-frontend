@@ -15,13 +15,13 @@ export default function SlicedHeart({
   sliceAxis,
   sweeping,
   sweepSpeed,
-  customURL,
+  customURL
 }) {
   const { gl } = useThree()
 
   const { scene: originalScene } = useGLTF(customURL ?? '/models/heart.glb')
 
-  // ✅ correct clone (NO hooks inside function)
+  //  correct clone (NO hooks inside function)
   const sceneA = useMemo(() => originalScene.clone(true), [originalScene])
   const sceneB = useMemo(() => originalScene.clone(true), [originalScene])
 
@@ -35,8 +35,8 @@ export default function SlicedHeart({
   }, [gl])
 
   // apply clipping to materials
-  const applyClipping = (scene) => {
-    scene.traverse((child) => {
+  const applyClipping = scene => {
+    scene.traverse(child => {
       if (child.isMesh) {
         child.material = child.material.clone()
         child.material.clippingPlanes = [PLANE]
@@ -54,8 +54,8 @@ export default function SlicedHeart({
   // axis control
   useEffect(() => {
     if (sliceAxis === 'horizontal') PLANE.normal.set(0, -1, 0)
-    if (sliceAxis === 'vertical')   PLANE.normal.set(-1, 0, 0)
-    if (sliceAxis === 'depth')      PLANE.normal.set(0, 0, -1)
+    if (sliceAxis === 'vertical') PLANE.normal.set(-1, 0, 0)
+    if (sliceAxis === 'depth') PLANE.normal.set(0, 0, -1)
 
     PLANE.constant = sliceY
     sweepRef.current = sliceY
@@ -63,7 +63,7 @@ export default function SlicedHeart({
 
   // ── Master-clock pulse + MRI sweep (was a drifting private sine clock) ──
   useEffect(() => {
-    const unsub = onEngineFrame((s) => {
+    const unsub = onEngineFrame(s => {
       const k = Math.max(s.contractLV, s.contractRV)
       const pulse = baseScale * (1 - 0.15 * k)
 
@@ -85,7 +85,6 @@ export default function SlicedHeart({
 
   return (
     <group ref={groupRef}>
-
       {/* TOP / FRONT / RIGHT HALF */}
       <primitive
         object={sceneA}
@@ -93,8 +92,8 @@ export default function SlicedHeart({
           sliceAxis === 'horizontal'
             ? [0, gap, 0]
             : sliceAxis === 'vertical'
-            ? [gap, 0, 0]
-            : [0, 0, gap]
+              ? [gap, 0, 0]
+              : [0, 0, gap]
         }
       />
 
@@ -105,8 +104,8 @@ export default function SlicedHeart({
           sliceAxis === 'horizontal'
             ? [0, -gap, 0]
             : sliceAxis === 'vertical'
-            ? [-gap, 0, 0]
-            : [0, 0, -gap]
+              ? [-gap, 0, 0]
+              : [0, 0, -gap]
         }
       />
     </group>

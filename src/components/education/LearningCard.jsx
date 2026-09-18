@@ -1,8 +1,9 @@
+import { X as XIcon } from 'lucide-react'
 const CHAMBER_DATA = {
   LV: {
     name: 'Left Ventricle',
     color: '#42a5f5',
-    icon: '🫀',
+    icon: '',
     function: 'Pumps oxygenated blood to the entire body via the aorta',
     pressure: '120/8 mmHg (systolic/diastolic)',
     volume: 'EDV: 120-140ml | ESV: 50-60ml',
@@ -13,7 +14,7 @@ const CHAMBER_DATA = {
   RV: {
     name: 'Right Ventricle',
     color: '#ef5350',
-    icon: '🫀',
+    icon: '',
     function: 'Pumps deoxygenated blood to the lungs via the pulmonary artery',
     pressure: '25/4 mmHg',
     volume: 'Lower volume than LV',
@@ -24,7 +25,7 @@ const CHAMBER_DATA = {
   LA: {
     name: 'Left Atrium',
     color: '#ce93d8',
-    icon: '🫀',
+    icon: '',
     function: 'Receives oxygenated blood from 4 pulmonary veins',
     pressure: '8-12 mmHg',
     volume: 'Reservoir before mitral valve opens',
@@ -35,13 +36,13 @@ const CHAMBER_DATA = {
   RA: {
     name: 'Right Atrium',
     color: '#f48fb1',
-    icon: '🫀',
+    icon: '',
     function: 'Receives deoxygenated blood from superior and inferior vena cava',
     pressure: '2-6 mmHg',
     volume: 'Low pressure reservoir',
     ef: 'Feeds RV through tricuspid valve',
     disease: 'Enlargement → Pulmonary hypertension, tricuspid regurgitation',
-    fact: 'The SA node — the heart\'s natural pacemaker — sits in the wall of the RA'
+    fact: "The SA node — the heart's natural pacemaker — sits in the wall of the RA"
   }
 }
 
@@ -50,24 +51,52 @@ export default function LearningCard({ selected, onClose }) {
   const c = CHAMBER_DATA[selected]
 
   return (
-    <div style={{
-      position: 'fixed', top: '60px', left: '250px',
-      background: '#1a1a2e', border: `2px solid ${c.color}`,
-      borderRadius: '12px', padding: '16px', width: '280px',
-      zIndex: 1000, boxShadow: `0 0 24px ${c.color}44`,
-      animation: 'fadeIn 0.3s ease'
-    }}>
-      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: '12px' }}>
-        <h3 style={{ color: c.color, margin: 0, fontSize: '14px' }}>{c.icon} {c.name}</h3>
-        <button onClick={onClose} style={{ background: 'none', border: 'none', color: '#888', cursor: 'pointer', fontSize: '16px' }}>✕</button>
+    <div
+      style={{
+        position: 'fixed',
+        top: '60px',
+        left: '250px',
+        background: '#1a1a2e',
+        border: `2px solid ${c.color}`,
+        borderRadius: '12px',
+        padding: '16px',
+        width: '280px',
+        zIndex: 1000,
+        boxShadow: `0 0 24px ${c.color}44`,
+        animation: 'fadeIn 0.3s ease'
+      }}
+    >
+      <div
+        style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: '12px'
+        }}
+      >
+        <h3 style={{ color: c.color, margin: 0, fontSize: '14px' }}>
+          {c.icon} {c.name}
+        </h3>
+        <button
+          onClick={onClose}
+          style={{
+            background: 'none',
+            border: 'none',
+            color: '#888',
+            cursor: 'pointer',
+            fontSize: '16px'
+          }}
+        >
+          <XIcon size={14} strokeWidth={2} />
+        </button>
       </div>
       {[
-        { label: '🎯 Function', text: c.function },
-        { label: '💨 Pressure', text: c.pressure },
-        { label: '📦 Volume', text: c.volume },
-        { label: '📊 EF', text: c.ef },
-        { label: '⚠️ Disease', text: c.disease },
-        { label: '💡 Key Fact', text: c.fact },
+        { label: 'Function', text: c.function },
+        { label: 'Pressure', text: c.pressure },
+        { label: 'Volume', text: c.volume },
+        { label: 'EF', text: c.ef },
+        { label: 'Disease', text: c.disease },
+        { label: 'Key Fact', text: c.fact }
       ].map(({ label, text }) => (
         <div key={label} style={{ marginBottom: '8px' }}>
           <div style={{ color: c.color, fontSize: '11px', fontWeight: 'bold' }}>{label}</div>

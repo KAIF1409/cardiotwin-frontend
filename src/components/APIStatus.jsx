@@ -3,9 +3,9 @@
  * =============
  * Header widget — polls GET / every 30 s and shows connection status.
  *
- * 🟢 API Live    — backend returned 200 OK
- * 🟡 Mock Mode   — special status from backend
- * 🔴 API Offline — network error or non-2xx response
+ *  API Live    — backend returned 200 OK
+ *  Mock Mode   — special status from backend
+ *  API Offline — network error or non-2xx response
  *
  * Place this file at:  src/components/APIStatus.jsx
  */
@@ -26,38 +26,42 @@ export default function APIStatus() {
       }
     }
 
-    check()                                      // immediate check on mount
-    const interval = setInterval(check, 30_000)  // then every 30 s
+    check() // immediate check on mount
+    const interval = setInterval(check, 30_000) // then every 30 s
     return () => clearInterval(interval)
   }, [])
 
   const color =
-    status.status === 'ok'   ? '#00e676' :
-    status.status === 'mock' ? '#ff9800' :
-    '#ef5350'
+    status.status === 'ok' ? '#00e676' : status.status === 'mock' ? '#ff9800' : '#ef5350'
 
   const dot =
-    status.status === 'ok'      ? '🟢' :
-    status.status === 'mock'    ? '🟡' :
-    status.status === 'checking'? '⚪' :
-    '🔴'
+    status.status === 'ok'
+      ? ''
+      : status.status === 'mock'
+        ? ''
+        : status.status === 'checking'
+          ? ''
+          : ''
 
   const label =
-    status.status === 'ok'      ? 'API Live'    :
-    status.status === 'mock'    ? 'Mock Mode'   :
-    status.status === 'checking'? 'Connecting…' :
-    'API Offline'
+    status.status === 'ok'
+      ? 'API Live'
+      : status.status === 'mock'
+        ? 'Mock Mode'
+        : status.status === 'checking'
+          ? 'Connecting…'
+          : 'API Offline'
 
   return (
     <div
       title={status.message}
       style={{
-        display:    'flex',
+        display: 'flex',
         alignItems: 'center',
-        gap:        '4px',
-        fontSize:   '10px',
+        gap: '4px',
+        fontSize: '10px',
         color,
-        cursor:     'default',
+        cursor: 'default'
       }}
     >
       <span>{dot}</span>

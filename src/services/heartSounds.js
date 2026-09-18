@@ -4,8 +4,8 @@
  * Clinical heart sounds generated procedurally, LOCKED to the master
  * cardiac engine's phase clock (same clock as ECG / 3-D mesh):
  *
- *   S1 "lub" @ 0.14 — AV valves snap shut at QRS (55 Hz thump, ~120 ms)
- *   S2 "dub" @ 0.46 — semilunar valves close (shorter, higher, tiny split)
+ *   S1 "lub"@ 0.14 — AV valves snap shut at QRS (55 Hz thump, ~120 ms)
+ *   S2 "dub"@ 0.46 — semilunar valves close (shorter, higher, tiny split)
  *   S3 @ ~0.58 — rapid-filling gallop: PATHOLOGICAL in adults (dilated /
  *        failing ventricle) → fires when Contractility < 40
  *   S4 @ ~0.09 — presystolic gallop: atrial kick against a STIFF ventricle
@@ -53,12 +53,25 @@ class HeartSoundsEngine {
     this._emit()
   }
 
-  isEnabled() { return this.enabled }
+  isEnabled() {
+    return this.enabled
+  }
 
   /** UI chips subscribe: fn(enabled, soundId|null) */
-  onSound(fn) { this._listeners.add(fn); return () => this._listeners.delete(fn) }
+  onSound(fn) {
+    this._listeners.add(fn)
+    return () => this._listeners.delete(fn)
+  }
 
-  _emit() { this._listeners.forEach(fn => { try { fn(this.enabled) } catch { /* noop */ } }) }
+  _emit() {
+    this._listeners.forEach(fn => {
+      try {
+        fn(this.enabled)
+      } catch {
+        /* noop */
+      }
+    })
+  }
 
   /* ── internals ───────────────────────────────────────────────────────── */
   _ensureCtx() {
@@ -73,12 +86,15 @@ class HeartSoundsEngine {
     const len = Math.floor(this.ctx.sampleRate * 2)
     this.noiseBuf = this.ctx.createBuffer(1, len, this.ctx.sampleRate)
     const d = this.noiseBuf.getChannelData(0)
-    let b0 = 0, b1 = 0, b2 = 0
-    for (let i = 0; i < len; i++) {          // cheap pink noise (Paul Kellet)
+    let b0 = 0,
+      b1 = 0,
+      b2 = 0
+    for (let i = 0; i < len; i++) {
+      // cheap pink noise (Paul Kellet)
       const w = Math.random() * 2 - 1
-      b0 = 0.99765 * b0 + w * 0.0990460
-      b1 = 0.96300 * b1 + w * 0.2965164
-      b2 = 0.57000 * b2 + w * 1.0526913
+      b0 = 0.99765 * b0 + w * 0.099046
+      b1 = 0.963 * b1 + w * 0.2965164
+      b2 = 0.57 * b2 + w * 1.0526913
       d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.16
     }
   }
@@ -97,20 +113,24 @@ class HeartSoundsEngine {
       g.gain.exponentialRampToValueAtTime(gain * (i ? 0.45 : 1), t + 0.012)
       g.gain.exponentialRampToValueAtTime(0.0001, t + decay)
       o.connect(g).connect(this.master)
-      o.start(t); o.stop(t + decay + 0.05)
+      o.start(t)
+      o.stop(t + decay + 0.05)
     })
     // valve click: short band-passed noise
     const n = this.ctx.createBufferSource()
     n.buffer = this.noiseBuf
     n.loop = true
     const bp = this.ctx.createBiquadFilter()
-    bp.type = 'bandpass'; bp.frequency.value = nFreq; bp.Q.value = q
+    bp.type = 'bandpass'
+    bp.frequency.value = nFreq
+    bp.Q.value = q
     const ng = this.ctx.createGain()
     ng.gain.setValueAtTime(0.0001, t)
     ng.gain.exponentialRampToValueAtTime(gain * noise, t + 0.008)
     ng.gain.exponentialRampToValueAtTime(0.0001, t + 0.05)
     n.connect(bp).connect(ng).connect(this.master)
-    n.start(t); n.stop(t + 0.08)
+    n.start(t)
+    n.stop(t + 0.08)
   }
 
   _murmur(duration, freq, q, gain) {
@@ -120,13 +140,16 @@ class HeartSoundsEngine {
     n.buffer = this.noiseBuf
     n.loop = true
     const bp = this.ctx.createBiquadFilter()
-    bp.type = 'bandpass'; bp.frequency.value = freq; bp.Q.value = q
+    bp.type = 'bandpass'
+    bp.frequency.value = freq
+    bp.Q.value = q
     const g = this.ctx.createGain()
     g.gain.setValueAtTime(0.0001, t)
-    g.gain.exponentialRampToValueAtTime(gain, t + duration * 0.35)  // crescendo
-    g.gain.exponentialRampToValueAtTime(0.0001, t + duration)       // decrescendo
+    g.gain.exponentialRampToValueAtTime(gain, t + duration * 0.35) // crescendo
+    g.gain.exponentialRampToValueAtTime(0.0001, t + duration) // decrescendo
     n.connect(bp).connect(g).connect(this.master)
-    n.start(t); n.stop(t + duration + 0.05)
+    n.start(t)
+    n.stop(t + duration + 0.05)
   }
 
   _startLoop() {
@@ -154,7 +177,7 @@ class HeartSoundsEngine {
         this._event('S3')
       }
       if (crossed(S4_PHASE) && (s.afterload > 75 || s.infarct > 40)) {
-        this._thump({ freq: 38, decay: 0.14, gain: 0.38, noise: 0.10, nFreq: 80 })
+        this._thump({ freq: 38, decay: 0.14, gain: 0.38, noise: 0.1, nFreq: 80 })
         this._event('S4')
       }
       this._prevPhase = p
@@ -162,10 +185,19 @@ class HeartSoundsEngine {
   }
 
   _event(id) {
-    this._listeners.forEach(fn => { try { fn(this.enabled, id) } catch { /* noop */ } })
+    this._listeners.forEach(fn => {
+      try {
+        fn(this.enabled, id)
+      } catch {
+        /* noop */
+      }
+    })
   }
 
-  _stopLoop() { this.stopFn?.(); this.stopFn = null }
+  _stopLoop() {
+    this.stopFn?.()
+    this.stopFn = null
+  }
 }
 
 const heartSounds = new HeartSoundsEngine()

@@ -22,14 +22,12 @@ import { useFrame } from '@react-three/fiber'
 import { Html } from '@react-three/drei'
 import * as THREE from 'three'
 import { getEngineState } from '../../simulation/cardiacEngine'
-import {
-  PATHS, getPathCurve, flowBus,
-} from '../../data/anatomyRegistry'
+import { PATHS, getPathCurve, flowBus } from '../../data/anatomyRegistry'
 
 // Rim-glow colours per circuit (spec palette)
 const GLOW = {
-  systemic:  new THREE.Color('#FF2E93'),   // crimson rim — oxygenated side
-  pulmonary: new THREE.Color('#00F2FE'),   // electric cyan — venous side
+  systemic: new THREE.Color('#FF2E93'), // crimson rim — oxygenated side
+  pulmonary: new THREE.Color('#00F2FE') // electric cyan — venous side
 }
 
 // ── Shared geometry cache (vessels rebuild never needed across views) ────────
@@ -46,35 +44,39 @@ function getTubeGeometry(p) {
 /** One unit sphere reused for every vessel end-cap (scaled per instance). */
 const _capGeo = new THREE.SphereGeometry(0.04, 12, 12)
 
-const endPoint = (p, which) =>
-  p.pts[which === 'start' ? 0 : p.pts.length - 1]
+const endPoint = (p, which) => p.pts[which === 'start' ? 0 : p.pts.length - 1]
 
 // ── One interactive vessel ────────────────────────────────────────────────────
-function Vessel({ p }) {
+function Vessel({ p, interactive = false }) {
   const [hovered, setHovered] = useState(false)
   const baseEmissive = useMemo(() => new THREE.Color('#170202'), [])
+  const active = interactive && hovered
 
-  const material = useMemo(() => new THREE.MeshPhysicalMaterial({
-    color:              p.color,
-    roughness:          0.30,     // spec §1.2
-    metalness:          0.05,
-    transmission:       0.10,     // spec §1.2
-    thickness:          1.4,
-    clearcoat:          0.50,     // spec §1.2
-    clearcoatRoughness: 0.38,
-    sheen:              0.55,
-    sheenColor:         new THREE.Color(p.circuit === 'systemic' ? '#ff6a5e' : '#7aa8ff'),
-    ior:                1.36,
-    emissive:           baseEmissive.clone(),
-    emissiveIntensity:  0.35,
-  }), [p, baseEmissive])
+  const material = useMemo(
+    () =>
+      new THREE.MeshPhysicalMaterial({
+        color: p.color,
+        roughness: 0.3, // spec §1.2
+        metalness: 0.05,
+        transmission: 0.1, // spec §1.2
+        thickness: 1.4,
+        clearcoat: 0.5, // spec §1.2
+        clearcoatRoughness: 0.38,
+        sheen: 0.55,
+        sheenColor: new THREE.Color(p.circuit === 'systemic' ? '#ff6a5e' : '#7aa8ff'),
+        ior: 1.36,
+        emissive: baseEmissive.clone(),
+        emissiveIntensity: 0.35
+      }),
+    [p, baseEmissive]
+  )
 
   // Dispose only what we constructed (never cached geometry)
   useEffect(() => () => material.dispose(), [material])
 
   const startCap = endPoint(p, 'start')
-  const endCap   = endPoint(p, 'end')
-  const mid      = useMemo(() => p.pts[Math.floor(p.pts.length / 2)], [p])
+  const endCap = endPoint(p, 'end')
+  const mid = useMemo(() => p.pts[Math.floor(p.pts.length / 2)], [p])
   const isCoronary = p.id.startsWith('COR') || p.id === 'COR_DIA'
 
   // Per-frame emissive breathing: coronaries pulse with LV contraction;
@@ -82,11 +84,14 @@ function Vessel({ p }) {
   const glowColor = GLOW[p.circuit]
   useFrame(() => {
     const s = getEngineState()
-    const contract = isCoronary ? s.contractLV : (p.circuit === 'systemic' ? s.contractLV : s.contractRV)
-    const target   = hovered ? 0.55 + 0.85 * contract : 0.10 + 0.22 * contract
-    material.emissive.lerp(hovered ? glowColor : baseEmissive, 0.18)
-    material.emissiveIntensity +=
-      (target - material.emissiveIntensity) * 0.18
+    const contract = isCoronary
+      ? s.contractLV
+      : p.circuit === 'systemic'
+        ? s.contractLV
+        : s.contractRV
+    const target = active ? 0.55 + 0.85 * contract : 0.1 + 0.22 * contract
+    material.emissive.lerp(active ? glowColor : baseEmissive, 0.18)
+    material.emissiveIntensity += (target - material.emissiveIntensity) * 0.18
   })
 
   return (
@@ -96,26 +101,55 @@ function Vessel({ p }) {
         geometry={getTubeGeometry(p)}
         material={material}
         castShadow
-        onPointerOver={e => { e.stopPropagation(); setHovered(true); flowBus.focusId = p.id }}
-        onPointerOut={() => { setHovered(false); if (flowBus.focusId === p.id) flowBus.focusId = null }}
-        onPointerDown={e => {
-          e.stopPropagation()
-          window.dispatchEvent(new CustomEvent('ct:focus-marker', { detail: p.id }))
-        }}
+        onPointerOver={
+          interactive
+            ? e => {
+                e.stopPropagation()
+                setHovered(true)
+                flowBus.focusId = p.id
+              }
+            : undefined
+        }
+        onPointerOut={
+          interactive
+            ? () => {
+                setHovered(false)
+                if (flowBus.focusId === p.id) flowBus.focusId = null
+              }
+            : undefined
+        }
+        onPointerDown={
+          interactive
+            ? e => {
+                e.stopPropagation()
+                window.dispatchEvent(new CustomEvent('ct:focus-marker', { detail: p.id }))
+              }
+            : undefined
+        }
       />
       {/* Endpoint spheres hide open tube bores */}
       {[startCap, endCap].map((c, i) => (
-        <mesh key={i} geometry={_capGeo} material={material} position={[c.x, c.y, c.z]}
-              scale={p.radius * 24} />
+        <mesh
+          key={i}
+          geometry={_capGeo}
+          material={material}
+          position={[c.x, c.y, c.z]}
+          scale={p.radius * 24}
+        />
       ))}
-      {/* Floating anatomical name badge while hovered */}
-      {hovered && (
-        <Html position={[mid.x, mid.y + 0.09, mid.z]} center zIndexRange={[40, 30]} style={{ pointerEvents: 'none' }}>
+      {/* Floating anatomical name badge — only while labels are enabled */}
+      {active && (
+        <Html
+          position={[mid.x, mid.y + 0.09, mid.z]}
+          center
+          zIndexRange={[40, 30]}
+          style={{ pointerEvents: 'none' }}
+        >
           <div className="an-badge" data-circuit={p.circuit}>
             <span className="an-badge-name">{p.fullName}</span>
             <span className="an-badge-desc">{p.info}</span>
             <span className="an-badge-circuit">
-              {p.circuit === 'systemic' ? '🔴 Oxygenated' : '🔵 Deoxygenated'}
+              {p.circuit === 'systemic' ? 'Oxygenated' : 'Deoxygenated'}
             </span>
           </div>
         </Html>
@@ -124,7 +158,7 @@ function Vessel({ p }) {
   )
 }
 
-export default function VascularSystem({ layers = {} }) {
+export default function VascularSystem({ layers = {}, interactive = false }) {
   const { arteries = true, veins = true } = layers
   return (
     <group>
@@ -132,9 +166,8 @@ export default function VascularSystem({ layers = {} }) {
         .filter(p => !p.flowOnly)
         .filter(p => (p.layer === 'veins' ? veins : arteries))
         .map(p => (
-          <Vessel key={p.id} p={p} />
+          <Vessel key={p.id} p={p} interactive={interactive} />
         ))}
     </group>
   )
 }
-

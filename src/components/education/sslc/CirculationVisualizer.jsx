@@ -12,29 +12,31 @@ import { setCirculationMode } from '../../../simulation/cardiacEngine'
 const MODES = [
   {
     id: 'both',
-    icon: '🔁',
+    icon: '',
     name: 'Double Circulation',
-    text: 'Blood passes through the heart TWICE per full body loop: right side → lungs (pulmonary), left side → body (systemic). Both circuits run together.',
+    text: 'Blood passes through the heart TWICE per full body loop: right side → lungs (pulmonary), left side → body (systemic). Both circuits run together.'
   },
   {
     id: 'pulmonary',
-    icon: '🫁',
+    icon: '',
     name: 'Pulmonary Circuit',
-    text: 'Right ventricle pumps deoxygenated blood through the pulmonary artery to the lungs. Oxygen is picked up, CO₂ released. Watch the BLUE stream.',
+    text: 'Right ventricle pumps deoxygenated blood through the pulmonary artery to the lungs. Oxygen is picked up, CO₂ released. Watch the BLUE stream.'
   },
   {
     id: 'systemic',
-    icon: '🦶',
+    icon: '',
     name: 'Systemic Circuit',
-    text: 'Left ventricle pumps oxygenated blood through the aorta to every organ. Watch the CYAN stream race around the body path.',
-  },
+    text: 'Left ventricle pumps oxygenated blood through the aorta to every organ. Watch the CYAN stream race around the body path.'
+  }
 ]
 
 export default function CirculationVisualizer() {
   const [mode, setMode] = useState('both')
   const active = MODES.find(m => m.id === mode)
 
-  useEffect(() => { setCirculationMode(mode) }, [mode])
+  useEffect(() => {
+    setCirculationMode(mode)
+  }, [mode])
 
   return (
     <div className="circ-viz">
@@ -45,14 +47,18 @@ export default function CirculationVisualizer() {
             className={mode === m.id ? 'active' : ''}
             onClick={() => setMode(m.id)}
           >
-            {m.icon} {m.name.split(' ')[0]}
+            {m.icon} {m.name.split('')[0]}
           </button>
         ))}
       </div>
       <p className="circ-text">{active.text}</p>
       <div className="circ-legend">
-        <span><i style={{ background: '#2563EB' }} /> Deoxygenated — pulmonary</span>
-        <span><i style={{ background: '#00F2FE' }} /> Oxygenated — systemic</span>
+        <span>
+          <i style={{ background: '#2563EB' }} /> Deoxygenated — pulmonary
+        </span>
+        <span>
+          <i style={{ background: '#00F2FE' }} /> Oxygenated — systemic
+        </span>
       </div>
     </div>
   )

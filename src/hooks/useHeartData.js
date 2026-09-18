@@ -21,12 +21,10 @@ export default function useHeartData() {
   const [heartData, setHeartData] = useState(null)
 
   useEffect(() => {
-    const unsub = subscribeHeartData((data) => {
+    const unsub = subscribeHeartData(data => {
       if (!data) return
       // Avoid unnecessary re-renders when state has not actually changed
-      setHeartData(prev =>
-        JSON.stringify(prev) === JSON.stringify(data) ? prev : { ...data }
-      )
+      setHeartData(prev => (JSON.stringify(prev) === JSON.stringify(data) ? prev : { ...data }))
     })
     return () => unsub()
   }, [])

@@ -6,12 +6,7 @@ import * as THREE from 'three'
 // ─────────────────────────────────────────────────────────────
 // Animated pulsing wrapper
 // ─────────────────────────────────────────────────────────────
-function PulsingMesh({
-  scene,
-  baseScale,
-  heartRate,
-  onBeat,
-}) {
+function PulsingMesh({ scene, baseScale, heartRate, onBeat }) {
   const groupRef = useRef()
   const timeRef = useRef(0)
   const lastBeatRef = useRef(false)
@@ -30,8 +25,7 @@ function PulsingMesh({
 
     lastBeatRef.current = isBeat
 
-    const pulse =
-      baseScale + (isBeat ? (beat - 0.85) * 0.4 : 0)
+    const pulse = baseScale + (isBeat ? (beat - 0.85) * 0.4 : 0)
 
     if (groupRef.current) {
       groupRef.current.scale.setScalar(pulse * 2)
@@ -49,12 +43,7 @@ function PulsingMesh({
 // ─────────────────────────────────────────────────────────────
 // Safe GLB Loader
 // ─────────────────────────────────────────────────────────────
-function LoadedModel({
-  url,
-  baseScale = 1,
-  heartRate = 72,
-  onBeat,
-}) {
+function LoadedModel({ url, baseScale = 1, heartRate = 72, onBeat }) {
   // IMPORTANT:
   // Remove Date.now() cache breaker
   // It causes loader instability
@@ -83,7 +72,7 @@ function LoadedModel({
     gltf.scene.position.sub(center)
 
     // Apply materials safely
-    gltf.scene.traverse((child) => {
+    gltf.scene.traverse(child => {
       if (!child.isMesh) return
 
       child.castShadow = true
@@ -108,12 +97,12 @@ function LoadedModel({
 
     return () => {
       // Cleanup geometries/materials
-      gltf.scene.traverse((child) => {
+      gltf.scene.traverse(child => {
         if (child.isMesh) {
           child.geometry?.dispose()
 
           if (Array.isArray(child.material)) {
-            child.material.forEach((m) => m.dispose())
+            child.material.forEach(m => m.dispose())
           } else {
             child.material?.dispose()
           }
@@ -123,12 +112,7 @@ function LoadedModel({
   }, [gltf])
 
   return (
-    <PulsingMesh
-      scene={gltf.scene}
-      baseScale={baseScale}
-      heartRate={heartRate}
-      onBeat={onBeat}
-    />
+    <PulsingMesh scene={gltf.scene} baseScale={baseScale} heartRate={heartRate} onBeat={onBeat} />
   )
 }
 
