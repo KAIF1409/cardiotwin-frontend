@@ -1,3 +1,4 @@
+import { X as XIcon } from 'lucide-react'
 const chambers = {
   LV: {
     name: 'Left Ventricle',
@@ -36,10 +37,7 @@ const chambers = {
   }
 }
 
-export default function ChamberInfo({
-  selected,
-  onClose
-}) {
+export default function ChamberInfo({ selected, onClose }) {
   // SAFETY FIX
   if (!selected || !chambers[selected]) return null
 
@@ -63,7 +61,7 @@ export default function ChamberInfo({
 
         boxShadow: `0 0 20px ${c.color}44`,
 
-        animation: 'fadeIn 0.3s ease',
+        animation: 'fadeIn 0.3s ease'
       }}
     >
       {/* HEADER */}
@@ -72,19 +70,18 @@ export default function ChamberInfo({
           display: 'flex',
           justifyContent: 'space-between',
           alignItems: 'center',
-          marginBottom: '10px',
+          marginBottom: '10px'
         }}
       >
         <h3
           style={{
             color: c.color,
             margin: 0,
-            fontSize: '14px',
+            fontSize: '14px'
           }}
         >
-          🫀 {c.name}
+          {c.name}
         </h3>
-
         <button
           onClick={onClose}
           style={{
@@ -92,55 +89,54 @@ export default function ChamberInfo({
             border: 'none',
             color: '#888',
             cursor: 'pointer',
-            fontSize: '16px',
+            fontSize: '16px'
           }}
         >
-          ✕
+          <XIcon size={14} strokeWidth={2} />
         </button>
       </div>
 
       {[
         {
-          label: '🎯 Role',
-          text: c.role,
+          label: 'Role',
+          text: c.role
         },
 
         {
-          label: '🧱 Walls',
-          text: c.walls,
+          label: 'Walls',
+          text: c.walls
         },
 
         {
-          label: '⚠️ Disease',
-          text: c.disease,
+          label: 'Disease',
+          text: c.disease
         },
 
         {
-          label: '📊 Normal',
-          text: c.normal,
-        },
+          label: 'Normal',
+          text: c.normal
+        }
       ].map(({ label, text }) => (
         <div
           key={label}
           style={{
-            marginBottom: '8px',
+            marginBottom: '8px'
           }}
         >
           <div
             style={{
               color: c.color,
               fontSize: '11px',
-              fontWeight: 'bold',
+              fontWeight: 'bold'
             }}
           >
             {label}
           </div>
-
           <div
             style={{
               color: '#ccc',
               fontSize: '11px',
-              lineHeight: '1.5',
+              lineHeight: '1.5'
             }}
           >
             {text}

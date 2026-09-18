@@ -3,18 +3,24 @@
   <head>
     <meta charset="utf-8" />
     <link rel="icon" href="%PUBLIC_URL%/favicon.ico" />
-    <meta name="viewport" content="width=device-width, initial-scale=1" />
-    <meta name="theme-color" content="#0A0D14" />
+    <!-- Mobile UX: viewport-fit=cover exposes the notch areas to CSS
+         (safe-area insets); pinch-zoom disabled so two-finger gestures
+         are reserved exclusively for the 3-D camera controls. -->
+    <meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, minimum-scale=1, user-scalable=no, viewport-fit=cover" />
+    <meta name="theme-color" content="#F8FAFC" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-status-bar-style" content="default" />
     <meta
       name="description"
-      content="CardioTwin-X — real-time cardiac digital twin: ECG, PV loops, strain mapping, blood-flow simulation and SSLC/PUC curriculum learning."
+            content="CardioTwin-X — professional cardiac education platform: real-time digital twin, ECG/PV-loop simulation, strain mapping, blood-flow visualization. No signup required."
     />
     <link rel="apple-touch-icon" href="%PUBLIC_URL%/logo192.png" />
     <link rel="preconnect" href="https://fonts.googleapis.com" />
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
     <link
       rel="stylesheet"
-      href="https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700;800&family=Plus+Jakarta+Sans:wght@500;600;700;800&display=swap"
+      href="https://fonts.googleapis.com/css2?family=Inter:wght@500;600;700;800&family=Plus+Jakarta+Sans:wght@400;500;600;700&display=swap"
     />
     <!--
       manifest.json provides metadata used when your web app is installed on a
@@ -30,7 +36,7 @@
       work correctly both with client-side routing and a non-root public URL.
       Learn how to configure a non-root public URL by running `npm run build`.
     -->
-    <title>CardioTwin-X · Clinical Digital Twin</title>
+        <title>CardioTwin-X · Professional Cardiac Education Platform</title>
   </head>
   <body>
     <noscript>You need to enable JavaScript to run this app.</noscript>

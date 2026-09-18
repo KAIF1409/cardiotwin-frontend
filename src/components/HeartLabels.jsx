@@ -1,97 +1,145 @@
-import { useState } from 'react'
+/**
+ * HeartLabels.jsx — on-demand anatomical labels with anatomy isolation
+ * ────────────────────────────────────────────────────────────────────
+ * Labels appear ONLY when user clicks the "Labels"toggle
+ * Each label is clickable → opens anatomy isolation panel
+ * "Anatomy"mode replaces the heart with the selected structure's 3D model
+ * Click "Return to Heart"to go back to the full heart model
+ */
+
 import { useFrame, useThree } from '@react-three/fiber'
 import * as THREE from 'three'
 
-// ─── LABEL ANCHORS with outward-facing normals ────────────────────────────────
-// Each normal points OUTWARD from the heart surface at that anchor location.
-// A label is visible only when its normal faces toward the camera.
+// ─── LABEL ANCHORS — positioned at structure centers ─────────────────────────
 const LABEL_ANCHORS = [
   {
     id: 'LV',
     fullName: 'Left Ventricle',
     color: '#00bcd4',
-    pos:    new THREE.Vector3(-0.35, -0.20,  0.15),
-    normal: new THREE.Vector3(-1,   -0.5,    1).normalize(),
-    desc: 'Main pumping chamber — sends oxygenated blood to the body',
+    pos: new THREE.Vector3(-0.35, -0.2, 0.15),
+    normal: new THREE.Vector3(-1, -0.5, 1).normalize()
   },
   {
     id: 'RV',
     fullName: 'Right Ventricle',
     color: '#ff9800',
-    pos:    new THREE.Vector3( 0.30, -0.15,  0.20),
-    normal: new THREE.Vector3( 1,   -0.5,    1).normalize(),
-    desc: 'Pumps deoxygenated blood to the lungs',
+    pos: new THREE.Vector3(0.3, -0.15, 0.2),
+    normal: new THREE.Vector3(1, -0.5, 1).normalize()
   },
   {
     id: 'LA',
     fullName: 'Left Atrium',
     color: '#ab47bc',
-    pos:    new THREE.Vector3(-0.28,  0.25, -0.20),
-    normal: new THREE.Vector3(-1,    0.5,   -1).normalize(),
-    desc: 'Receives oxygenated blood from the lungs',
+    pos: new THREE.Vector3(-0.28, 0.25, -0.2),
+    normal: new THREE.Vector3(-1, 0.5, -1).normalize()
   },
   {
     id: 'RA',
     fullName: 'Right Atrium',
     color: '#ef5350',
-    pos:    new THREE.Vector3( 0.28,  0.25, -0.15),
-    normal: new THREE.Vector3( 1,    0.5,   -1).normalize(),
-    desc: 'Receives deoxygenated blood from the body',
+    pos: new THREE.Vector3(0.28, 0.25, -0.15),
+    normal: new THREE.Vector3(1, 0.5, -1).normalize()
   },
   {
     id: 'Aorta',
     fullName: 'Aorta',
     color: '#00e676',
-    pos:    new THREE.Vector3(-0.12,  0.65,  0.05),
-    normal: new THREE.Vector3(-0.3,   1,     0.3).normalize(),
-    desc: 'Main artery — carries oxygenated blood from LV to body',
+    pos: new THREE.Vector3(-0.12, 0.65, 0.05),
+    normal: new THREE.Vector3(-0.3, 1, 0.3).normalize()
   },
   {
     id: 'PA',
     fullName: 'Pulmonary Artery',
     color: '#ffd740',
-    pos:    new THREE.Vector3( 0.15,  0.60,  0.10),
-    normal: new THREE.Vector3( 0.3,   1,     0.3).normalize(),
-    desc: 'Carries deoxygenated blood from RV to lungs',
+    pos: new THREE.Vector3(0.15, 0.6, 0.1),
+    normal: new THREE.Vector3(0.3, 1, 0.3).normalize()
+  },
+  {
+    id: 'MV',
+    fullName: 'Mitral Valve',
+    color: '#80cbc4',
+    pos: new THREE.Vector3(-0.2, 0.05, 0.1),
+    normal: new THREE.Vector3(-0.5, 0, 1).normalize()
+  },
+  {
+    id: 'TV',
+    fullName: 'Tricuspid Valve',
+    color: '#f48fb1',
+    pos: new THREE.Vector3(0.2, 0.05, 0.1),
+    normal: new THREE.Vector3(0.5, 0, 1).normalize()
+  },
+  {
+    id: 'AV',
+    fullName: 'Aortic Valve',
+    color: '#ce93d8',
+    pos: new THREE.Vector3(-0.05, 0.35, 0.08),
+    normal: new THREE.Vector3(-0.2, 1, 0.3).normalize()
+  },
+  {
+    id: 'PV',
+    fullName: 'Pulmonary Valve',
+    color: '#fff176',
+    pos: new THREE.Vector3(0.1, 0.4, 0.08),
+    normal: new THREE.Vector3(0.3, 1, 0.3).normalize()
   },
   {
     id: 'MYO',
     fullName: 'Myocardium',
     color: '#ff6e6e',
-    pos:    new THREE.Vector3( 0.00, -0.62,  0.10),
-    normal: new THREE.Vector3( 0,   -1,      0.3).normalize(),
-    desc: 'Heart wall muscle — thickness reflects hypertrophy or damage',
+    pos: new THREE.Vector3(0.0, -0.62, 0.1),
+    normal: new THREE.Vector3(0, -1, 0.3).normalize()
   },
-  // ── Extra labels that were missing ──────────────────────────────────
   {
     id: 'Apex',
     fullName: 'Cardiac Apex',
     color: '#f06292',
-    pos:    new THREE.Vector3( 0.00, -0.80,  0.05),
-    normal: new THREE.Vector3( 0,   -1,      0).normalize(),
-    desc: 'Tip of the heart — formed by the LV, points down-left',
+    pos: new THREE.Vector3(0.0, -0.8, 0.05),
+    normal: new THREE.Vector3(0, -1, 0).normalize()
   },
   {
     id: 'IVS',
     fullName: 'Interventricular Septum',
     color: '#80cbc4',
-    pos:    new THREE.Vector3( 0.02, -0.10,  0.18),
-    normal: new THREE.Vector3( 0,    0,      1).normalize(),
-    desc: 'Wall separating LV and RV — thickened in HCM',
+    pos: new THREE.Vector3(0.02, -0.1, 0.18),
+    normal: new THREE.Vector3(0, 0, 1).normalize()
   },
+  {
+    id: 'SVC',
+    fullName: 'Superior Vena Cava',
+    color: '#90caf9',
+    pos: new THREE.Vector3(0.2, 0.7, -0.05),
+    normal: new THREE.Vector3(0.5, 1, -0.2).normalize()
+  },
+  {
+    id: 'IVC',
+    fullName: 'Inferior Vena Cava',
+    color: '#64b5f6',
+    pos: new THREE.Vector3(0.15, -0.55, -0.05),
+    normal: new THREE.Vector3(0.3, -1, -0.2).normalize()
+  },
+  {
+    id: 'PVein',
+    fullName: 'Pulmonary Veins',
+    color: '#aed581',
+    pos: new THREE.Vector3(-0.2, 0.3, -0.25),
+    normal: new THREE.Vector3(-0.5, 0.5, -1).normalize()
+  }
 ]
 
 // ── Reusable vectors (avoid GC pressure) ─────────────────────────────────────
-const _worldPos    = new THREE.Vector3()
+const _worldPos = new THREE.Vector3()
 const _worldNormal = new THREE.Vector3()
-const _toCam       = new THREE.Vector3()
-const _normalMat   = new THREE.Matrix3()
+const _toCam = new THREE.Vector3()
+const _normalMat = new THREE.Matrix3()
 
 // ─── 3D PROJECTOR ─────────────────────────────────────────────────────────────
-export function HeartLabels3D({ onProjected, heartGroupRef }) {
+// `enabled`(default FALSE) — spec: labels are hidden until the user flips the
+// Labels toggle. While disabled the projector early-outs, costing nothing.
+export function HeartLabels3D({ onProjected, heartGroupRef, enabled = false }) {
   const { camera, size } = useThree()
 
   useFrame(() => {
+    if (!enabled) return
     const heart = heartGroupRef?.current
     if (!heart) return
 
@@ -110,23 +158,23 @@ export function HeartLabels3D({ onProjected, heartGroupRef }) {
       _toCam.subVectors(camera.position, _worldPos).normalize()
 
       // ── 4. Back-face culling: dot > 0 means facing camera ─────────
-      //    Threshold 0.0 = exactly 90°; use small positive margin so
-      //    labels disappear slightly before they hit the silhouette.
+      // Threshold 0.0 = exactly 90°; use small positive margin so
+      // labels disappear slightly before they hit the silhouette.
       const facingCamera = _worldNormal.dot(_toCam) > 0.08
 
       // ── 5. NDC → pixel coords ─────────────────────────────────────
       const ndc = _worldPos.clone().project(camera)
-      const x = ( ndc.x * 0.5 + 0.5) * size.width
+      const x = (ndc.x * 0.5 + 0.5) * size.width
       const y = (-ndc.y * 0.5 + 0.5) * size.height
 
       // behind camera guard
       const inFront = ndc.z < 1.0
 
       return {
-        id:      label.id,
+        id: label.id,
         x,
         y,
-        visible: facingCamera && inFront,
+        visible: facingCamera && inFront
       }
     })
 
@@ -136,217 +184,86 @@ export function HeartLabels3D({ onProjected, heartGroupRef }) {
   return null
 }
 
-// ─── HTML OVERLAY ─────────────────────────────────────────────────────────────
-export function HeartLabelsHTML({
-  labels,
-  selectedChamber,
-  onSelectChamber,
-  ef,
-  edv,
-  esv,
-  contractility,
-}) {
-  const [hover, setHover] = useState(null)
-
+// ─── HTML OVERLAY — MINIMAL ──────────────────────────────────────────────────
+// NO hover tooltips. NO panels. NO introduction text. NO EF badges.
+// Just tiny dots + tiny text. That's it.
+export function HeartLabelsHTML({ labels, onFocus }) {
   if (!labels || labels.length === 0) return null
 
-  // Build lookup map
   const map = {}
-  labels.forEach(l => { map[l.id] = l })
-
-  const efVal   = ef  ?? Math.round(40 + (contractility ?? 50) * 0.3)
-  const efLabel = efVal >= 55 ? '✅ Normal' : efVal >= 40 ? '⚠️ Reduced' : '🔴 Low'
-  const efBg    = efVal >= 55 ? '#1b5e20'  : efVal >= 40 ? '#e65100'   : '#b71c1c'
+  labels.forEach(l => {
+    map[l.id] = l
+  })
 
   return (
-    <div style={{
-      position: 'absolute',
-      inset: 0,
-      pointerEvents: 'none',
-      overflow: 'hidden',
-    }}>
-
-      {/* ── EF / EDV / ESV badges ── */}
-      <div style={{
-        position: 'absolute', top: 10, left: '50%',
-        transform: 'translateX(-50%)',
-        display: 'flex', gap: 8, alignItems: 'center',
-        flexWrap: 'wrap', justifyContent: 'center',
-        pointerEvents: 'none', zIndex: 20,
-      }}>
-        <div style={{
-          background: efBg, color: 'white',
-          padding: '4px 16px', borderRadius: 20,
-          fontSize: 13, fontWeight: 'bold',
-          boxShadow: '0 2px 12px #0008',
-        }}>
-          EF: {efVal}% {efLabel}
-        </div>
-        {edv && (
-          <div style={{
-            background: '#0d1b2a', border: '1px solid #00bcd444',
-            color: '#00bcd4', padding: '4px 10px',
-            borderRadius: 20, fontSize: 11, fontWeight: 'bold',
-          }}>
-            EDV: {edv} ml
-          </div>
-        )}
-        {esv && (
-          <div style={{
-            background: '#0d1b2a', border: '1px solid #ff980044',
-            color: '#ff9800', padding: '4px 10px',
-            borderRadius: 20, fontSize: 11, fontWeight: 'bold',
-          }}>
-            ESV: {esv} ml
-          </div>
-        )}
-      </div>
-
-      {/* ── SVG connector lines ── */}
-      <svg style={{
-        position: 'absolute', inset: 0,
-        width: '100%', height: '100%',
-        pointerEvents: 'none', overflow: 'visible', zIndex: 1,
-      }}>
-        {LABEL_ANCHORS.map(label => {
-          const p = map[label.id]
-          if (!p?.visible) return null
-          const sel = selectedChamber === label.id
-          return (
-            <line key={label.id}
-              x1={p.x} y1={p.y}
-              x2={p.x + 16} y2={p.y}
-              stroke={label.color}
-              strokeWidth={sel ? 1.5 : 0.8}
-              strokeDasharray={sel ? 'none' : '4 3'}
-              opacity={sel ? 0.9 : 0.45}
-            />
-          )
-        })}
-      </svg>
-
-      {/* ── Label dots + chips ── */}
+    <div
+      className="labels-layer"
+      style={{
+        position: 'absolute',
+        inset: 0,
+        pointerEvents: 'none',
+        overflow: 'hidden',
+        zIndex: 5
+      }}
+    >
       {LABEL_ANCHORS.map(label => {
         const p = map[label.id]
         if (!p?.visible) return null
-
-        const isSelected = selectedChamber === label.id
-        const isHovered  = hover === label.id
 
         return (
           <div
             key={label.id}
             style={{
               position: 'absolute',
-              left: p.x, top: p.y,
-              transform: 'translate(-50%,-50%)',
+              left: p.x,
+              top: p.y,
+              transform: 'translate(-50%, -50%)',
               pointerEvents: 'auto',
               cursor: 'pointer',
-              zIndex: 20,
+              display: 'flex',
+              alignItems: 'center',
+              gap: 4
             }}
-            onClick={() => onSelectChamber?.(isSelected ? null : label.id)}
-            onMouseEnter={() => setHover(label.id)}
-            onMouseLeave={() => setHover(null)}
+            onClick={() => onFocus?.(label.id)}
+            title={label.fullName}
           >
-            {/* Pulse ring on selected */}
-            {isSelected && (
-              <div style={{
-                position: 'absolute', top: '50%', left: '50%',
-                width: 24, height: 24, borderRadius: '50%',
-                border: `2px solid ${label.color}`,
-                transform: 'translate(-50%,-50%)',
-                animation: 'ct-pulse 1.2s ease-out infinite',
-                pointerEvents: 'none',
-              }} />
-            )}
-
-            {/* Dot */}
-            <div style={{
-              width:  isSelected ? 13 : isHovered ? 11 : 8,
-              height: isSelected ? 13 : isHovered ? 11 : 8,
-              borderRadius: '50%',
-              background: label.color,
-              border: `2px solid ${isSelected ? 'white' : 'rgba(255,255,255,0.5)'}`,
-              boxShadow: `0 0 ${isSelected ? 16 : isHovered ? 10 : 6}px ${label.color}`,
-              transition: 'all 0.2s',
-              position: 'relative', zIndex: 2,
-            }} />
-
-            {/* Chip label */}
-            <div style={{
-              position: 'absolute', top: '50%', left: 14,
-              transform: 'translateY(-50%)',
-              background: isSelected ? label.color : 'rgba(6,6,18,0.92)',
-              color: isSelected ? 'white' : label.color,
-              fontSize: 11, fontWeight: 'bold',
-              padding: '2px 8px', borderRadius: 4,
-              border: `1px solid ${label.color}`,
-              whiteSpace: 'nowrap',
-              transition: 'all 0.2s',
-              boxShadow: isSelected ? `0 0 10px ${label.color}55` : '0 1px 4px #000a',
-              letterSpacing: '0.5px', zIndex: 3,
-            }}>
+            <div
+              style={{
+                width: 6,
+                height: 6,
+                borderRadius: '50%',
+                background: label.color,
+                border: '1.5px solid rgba(255,255,255,0.6)',
+                boxShadow: `0 0 4px ${label.color}88`,
+                flexShrink: 0
+              }}
+            />
+            <span
+              style={{
+                fontSize: 9,
+                fontWeight: 600,
+                color: label.color,
+                background: 'rgba(6,6,18,0.75)',
+                padding: '1px 4px',
+                borderRadius: 3,
+                whiteSpace: 'nowrap',
+                letterSpacing: '0.3px',
+                lineHeight: 1.2
+              }}
+            >
               {label.id}
-            </div>
-
-            {/* Hover tooltip */}
-            {isHovered && (
-              <div style={{
-                position: 'absolute', bottom: 22, left: '50%',
-                transform: 'translateX(-50%)',
-                background: '#080818',
-                border: `1px solid ${label.color}`,
-                color: 'white', fontSize: 10,
-                padding: '7px 12px', borderRadius: 8,
-                zIndex: 200,
-                boxShadow: `0 4px 20px #000c, 0 0 10px ${label.color}33`,
-                pointerEvents: 'none',
-                width: 200, whiteSpace: 'normal',
-                lineHeight: 1.6, textAlign: 'center',
-              }}>
-                <div style={{ color: label.color, fontWeight: 'bold', marginBottom: 4, fontSize: 11 }}>
-                  {label.fullName}
-                </div>
-                <div style={{ color: '#bbb' }}>{label.desc}</div>
-                {/* Arrow */}
-                <div style={{
-                  position: 'absolute', bottom: -6, left: '50%',
-                  transform: 'translateX(-50%)',
-                  width: 0, height: 0,
-                  borderLeft: '6px solid transparent',
-                  borderRight: '6px solid transparent',
-                  borderTop: `6px solid ${label.color}`,
-                }} />
-              </div>
-            )}
+            </span>
           </div>
         )
       })}
-
-      {/* ── Bottom hint ── */}
-      <div style={{
-        position: 'absolute', bottom: 12, left: '50%',
-        transform: 'translateX(-50%)',
-        color: '#3a3a5a', fontSize: 11,
-        pointerEvents: 'none', whiteSpace: 'nowrap',
-        letterSpacing: '0.3px',
-      }}>
-        Click labels to explore · Drag to rotate · Scroll to zoom
-      </div>
-
-      {/* ── Pulse animation ── */}
-      <style>{`
-        @keyframes ct-pulse {
-          0%   { transform: translate(-50%,-50%) scale(0.6); opacity: 0.9; }
-          100% { transform: translate(-50%,-50%) scale(2.4); opacity: 0; }
-        }
-      `}</style>
     </div>
   )
 }
 
 // Legacy default export (no-op)
-export default function HeartLabels() { return null }
+export default function HeartLabels() {
+  return null
+}
 
 // Public list for the viewport toolbar / camera focus system
 export const ANATOMY_MARKERS = LABEL_ANCHORS

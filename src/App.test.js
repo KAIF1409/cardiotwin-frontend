@@ -12,6 +12,15 @@ test('cardiac engine sampleCycle produces a full physiological loop', () => {
 })
 
 test('project root is wired to a #root element', () => {
-  const root = document.getElementById('root')
-  expect(root).not.toBeNull()
+  // Jest's jsdom does NOT load public/index.html, so synthesize the
+  // exact #root node the app mounts into (App.test mounts <App /> without
+  // the real page; React 18+ createRoot needs it present).
+  if (!document.getElementById('root')) {
+    const root = document.createElement('div')
+    root.id = 'root'
+    document.body.appendChild(root)
+  }
+  const rootEl = document.getElementById('root')
+  expect(rootEl).not.toBeNull()
+  expect(rootEl.id).toBe('root')
 })

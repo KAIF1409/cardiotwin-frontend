@@ -1,32 +1,45 @@
 /**
- * HeaderBar.jsx — compact clinical status bar
- * ────────────────────────────────────────────
+ * HeaderBar.jsx — professional status bar
+ * ────────────────────────────────────────
  * • CardioTwin-X brand mark
- * • Live/Offline WebSocket badge (subscribeConnectionState)
+ * • Live/Offline WebSocket badge
  * • Global BPM meter (engine-driven, animated pulse dot)
- * • Clinical ⇄ Education mode switch
+ * • Normal ⇄ Higher mode switch (no grade mentions — B2B product)
  * • Live EF / BP readouts
  */
 
 import { useEffect, useState } from 'react'
+import { Heart, Activity, Gauge, Maximize2, Minimize2 } from 'lucide-react'
 import { subscribeConnectionState } from '../../services/apiService'
 import { subscribeEngineState } from '../../simulation/cardiacEngine'
 
 const CONN_META = {
-  online_ws:   { label: 'LIVE',       tone: 'live',    tip: 'WebSocket streaming @10 Hz' },
-  online_poll: { label: 'HTTP',       tone: 'poll',    tip: 'Backend reachable — HTTP polling fallback' },
-  connecting:  { label: 'SYNC…',      tone: 'wait',    tip: 'Establishing connection…' },
-  offline:     { label: 'OFFLINE',    tone: 'off',     tip: 'Backend unreachable — running local physics model' },
+  online_ws: { label: 'LIVE', tone: 'live', tip: 'WebSocket streaming @10 Hz' },
+  online_poll: { label: 'HTTP', tone: 'poll', tip: 'Backend reachable — HTTP polling fallback' },
+  connecting: { label: 'SYNC…', tone: 'wait', tip: 'Establishing connection…' },
+  offline: {
+    label: 'OFFLINE',
+    tone: 'off',
+    tip: 'Backend unreachable — running local physics model'
+  }
 }
 
-export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
-  const [conn, setConn]       = useState('connecting')
-  const [meter, setMeter]     = useState({ bpm: 75, phase: 0, ef: 60 })
+export default function HeaderBar({
+  appMode,
+  onModeChange,
+  sysBP,
+  diaBP,
+  fullscreenOn,
+  onToggleFullscreen
+}) {
+  const [conn, setConn] = useState('connecting')
+  const [meter, setMeter] = useState({ bpm: 75, phase: 0, ef: 60 })
 
   useEffect(() => subscribeConnectionState(setConn), [])
-
-  useEffect(() => subscribeEngineState(s =>
-    setMeter({ bpm: s.bpm, phase: s.phase, ef: s.ef }), 12), [])
+  useEffect(
+    () => subscribeEngineState(s => setMeter({ bpm: s.bpm, phase: s.phase, ef: s.ef }), 12),
+    []
+  )
 
   const meta = CONN_META[conn] ?? CONN_META.connecting
   const systolic = meter.phase >= 0.14 && meter.phase < 0.46
@@ -35,9 +48,11 @@ export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
     <header className="header">
       {/* Brand */}
       <div className="brand" title="CardioTwin-X — Real-time Cardiac Digital Twin">
-        <span className="brand-glyph">🫀</span>
-        <span className="brand-name">CardioTwin<em>-X</em></span>
-        <span className="brand-tag">CLINICAL DIGITAL TWIN</span>
+        <Heart size={20} className="brand-icon" strokeWidth={1.5} />
+        <span className="brand-name">
+          CardioTwin<em>‑X</em>
+        </span>
+        <span className="brand-tag">CARDIAC EDUCATION PLATFORM</span>
       </div>
 
       {/* Center meters */}
@@ -50,7 +65,11 @@ export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
         </div>
 
         <div className="bp-chip" title="Arterial pressure estimate">
-          <span className="bp-val">{sysBP}<i>/</i>{diaBP}</span>
+          <span className="bp-val">
+            {sysBP}
+            <i>/</i>
+            {diaBP}
+          </span>
           <span className="bp-lbl">mmHg</span>
         </div>
 
@@ -62,11 +81,7 @@ export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
 
       {/* Right cluster */}
       <div className="header-actions">
-        <span
-          className={`conn-badge conn-${meta.tone}`}
-          title={meta.tip}
-          data-tip={meta.tip}
-        >
+        <span className={`conn-badge conn-${meta.tone}`} title={meta.tip} data-tip={meta.tip}>
           <i className="conn-dot" />
           {meta.label}
         </span>
@@ -74,23 +89,35 @@ export default function HeaderBar({ appMode, onModeChange, sysBP, diaBP }) {
         <div className="mode-switch" role="tablist" aria-label="App mode">
           <button
             role="tab"
-            aria-selected={appMode === 'clinical'}
-            className={appMode === 'clinical' ? 'active' : ''}
-            onClick={() => onModeChange('clinical')}
-            title="Free experimentation with all parameters"
+            aria-selected={appMode === 'normal'}
+            className={appMode === 'normal' ? 'active' : ''}
+            onClick={() => onModeChange('normal')}
+            title="Standard view — essential anatomy, blood flow, basic hemodynamics"
           >
-            ⚕ Clinical
+            <Gauge size={14} strokeWidth={1.5} />
+            <span>Normal</span>
           </button>
           <button
             role="tab"
-            aria-selected={appMode === 'education'}
-            className={appMode === 'education' ? 'active' : ''}
-            onClick={() => onModeChange('education')}
-            title="Curriculum-guided SSLC & PUC learning tracks"
+            aria-selected={appMode === 'higher'}
+            className={appMode === 'higher' ? 'active' : ''}
+            onClick={() => onModeChange('higher')}
+            title="Advanced view — strain heatmap, conduction system, valve detail, clinical metadata"
           >
-            🎓 Education
+            <Activity size={14} strokeWidth={1.5} />
+            <span>Higher</span>
           </button>
         </div>
+
+        <button
+          className={`fs-btn ${fullscreenOn ? 'active' : ''}`}
+          onClick={onToggleFullscreen}
+          title={fullscreenOn ? 'Exit fullscreen' : 'Immersive fullscreen (Esc to exit)'}
+          aria-label="Toggle immersive fullscreen"
+        >
+          {fullscreenOn ? <Minimize2 size={14} /> : <Maximize2 size={14} />}
+          <span>{fullscreenOn ? 'Exit' : 'Fullscreen'}</span>
+        </button>
       </div>
     </header>
   )

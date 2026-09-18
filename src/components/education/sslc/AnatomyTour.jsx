@@ -10,14 +10,62 @@ import { useEffect, useState } from 'react'
 import { ANATOMY_MARKERS } from '../../HeartLabels'
 
 const STEPS = [
-  { id: 'overview', icon: '🫀', name: 'The Heart', text: 'A fist-sized muscular pump in your chest. It beats ~100,000 times a day, pushing blood to your lungs and your whole body.', focus: null },
-  { id: 'RA', icon: '🔵', name: 'Right Atrium (RA)', text: 'Receives DEOXYGENATED (carbon-dioxide rich) blood returning from the body through the vena cava. Blue particles flow in here.', focus: 'RA' },
-  { id: 'RV', icon: '🔵', name: 'Right Ventricle (RV)', text: 'Pumps the blue blood through the pulmonary artery to the LUNGS to pick up oxygen. It works at low pressure — lungs are close by.', focus: 'RV' },
-  { id: 'LA', icon: '🔴', name: 'Left Atrium (LA)', text: 'Receives OXYGENATED (bright red) blood coming back from the lungs through pulmonary veins. Cyan particles flow in here.', focus: 'LA' },
-  { id: 'LV', icon: '🔴', name: 'Left Ventricle (LV)', text: 'The strongest chamber! Its thick wall pumps red blood all the way to your toes through the aorta.', focus: 'LV' },
-  { id: 'IVS', icon: '🧱', name: 'Septum (IVS)', text: 'The muscular wall dividing left from right. It keeps oxygen-rich and oxygen-poor blood completely separate — that is DOUBLE circulation.', focus: 'IVS' },
-  { id: 'MYO', icon: '💪', name: 'Myocardium', text: 'The heart muscle itself. Like any muscle it needs its own blood supply — the coronary arteries.', focus: 'MYO' },
-  { id: 'pericardium', icon: '🛡️', name: 'Pericardium', text: 'A tough double-walled sac that surrounds and protects the whole heart. Lubricating fluid between its layers lets the heart beat smoothly without friction. Inflammation of this sac is called pericarditis.', focus: null },
+  {
+    id: 'overview',
+    icon: '',
+    name: 'The Heart',
+    text: 'A fist-sized muscular pump in your chest. It beats ~100,000 times a day, pushing blood to your lungs and your whole body.',
+    focus: null
+  },
+  {
+    id: 'RA',
+    icon: '',
+    name: 'Right Atrium (RA)',
+    text: 'Receives DEOXYGENATED (carbon-dioxide rich) blood returning from the body through the vena cava. Blue particles flow in here.',
+    focus: 'RA'
+  },
+  {
+    id: 'RV',
+    icon: '',
+    name: 'Right Ventricle (RV)',
+    text: 'Pumps the blue blood through the pulmonary artery to the LUNGS to pick up oxygen. It works at low pressure — lungs are close by.',
+    focus: 'RV'
+  },
+  {
+    id: 'LA',
+    icon: '',
+    name: 'Left Atrium (LA)',
+    text: 'Receives OXYGENATED (bright red) blood coming back from the lungs through pulmonary veins. Cyan particles flow in here.',
+    focus: 'LA'
+  },
+  {
+    id: 'LV',
+    icon: '',
+    name: 'Left Ventricle (LV)',
+    text: 'The strongest chamber! Its thick wall pumps red blood all the way to your toes through the aorta.',
+    focus: 'LV'
+  },
+  {
+    id: 'IVS',
+    icon: '',
+    name: 'Septum (IVS)',
+    text: 'The muscular wall dividing left from right. It keeps oxygen-rich and oxygen-poor blood completely separate — that is DOUBLE circulation.',
+    focus: 'IVS'
+  },
+  {
+    id: 'MYO',
+    icon: '',
+    name: 'Myocardium',
+    text: 'The heart muscle itself. Like any muscle it needs its own blood supply — the coronary arteries.',
+    focus: 'MYO'
+  },
+  {
+    id: 'pericardium',
+    icon: '',
+    name: 'Pericardium',
+    text: 'A tough double-walled sac that surrounds and protects the whole heart. Lubricating fluid between its layers lets the heart beat smoothly without friction. Inflammation of this sac is called pericarditis.',
+    focus: null
+  }
 ]
 
 export default function AnatomyTour({ onHeartSync }) {
@@ -28,9 +76,11 @@ export default function AnatomyTour({ onHeartSync }) {
   useEffect(() => {
     onHeartSync(
       { Preload: 50, Afterload: 50, Contractility: 60, 'Infarct %': 0, 'Valve Area': 100 },
-      'chamber',
+      'chamber'
     )
-    return () => { /* hub closes handle reset */ }
+    return () => {
+      /* hub closes handle reset */
+    }
   }, [onHeartSync])
 
   const go = idx => {
@@ -51,7 +101,9 @@ export default function AnatomyTour({ onHeartSync }) {
       <div className="tour-step-head">
         <span className="tour-step-icon">{step.icon}</span>
         <strong>{step.name}</strong>
-        <span className="tour-count">{i + 1}/{STEPS.length}</span>
+        <span className="tour-count">
+          {i + 1}/{STEPS.length}
+        </span>
       </div>
       <p className="tour-text">{step.text}</p>
 
@@ -61,13 +113,19 @@ export default function AnatomyTour({ onHeartSync }) {
           <button key={s.id} onClick={() => go(k)} className={k === i ? 'on' : ''} title={s.name} />
         ))}
       </div>
-
       <div className="tour-nav">
-        <button disabled={i === 0} onClick={() => go(i - 1)}>← Back</button>
+        <button disabled={i === 0} onClick={() => go(i - 1)}>
+          ← Back
+        </button>
         {i < STEPS.length - 1 ? (
-          <button className="primary" onClick={() => go(i + 1)}>Next →</button>
+          <button className="primary" onClick={() => go(i + 1)}>
+            Next →
+          </button>
         ) : (
-          <button className="primary" onClick={() => go(0)}>🔁 Restart</button>
+          <button className="primary" onClick={() => go(0)}>
+            {' '}
+            Restart
+          </button>
         )}
       </div>
     </div>

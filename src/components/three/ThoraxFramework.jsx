@@ -27,21 +27,21 @@ import { buildThorax } from '../../data/anatomyRegistry'
 // ── Material factory (one cloned material per bone for local glow) ──────────
 function makeBoneMaterial(kind) {
   const cartilage = kind === 'cartilage'
-  const disc      = kind === 'disc'
+  const disc = kind === 'disc'
   return new THREE.MeshPhysicalMaterial({
-    color:              disc ? '#b8b2a2' : cartilage ? '#cdd6f4' : '#E9E3D1',
-    roughness:          disc ? 0.5 : 0.36,
-    metalness:          0.02,
-    transmission:       cartilage ? 0.55 : 0.42,
-    thickness:          0.9,
-    clearcoat:          0.60,
-    clearcoatRoughness: 0.30,
-    ior:                1.45,
-    transparent:        true,
-    opacity:            disc ? 0.24 : cartilage ? 0.20 : 0.30,
-    depthWrite:         false,
-    emissive:           new THREE.Color('#151207'),
-    emissiveIntensity:  0.25,
+    color: disc ? '#b8b2a2' : cartilage ? '#cdd6f4' : '#E9E3D1',
+    roughness: disc ? 0.5 : 0.36,
+    metalness: 0.02,
+    transmission: cartilage ? 0.55 : 0.42,
+    thickness: 0.9,
+    clearcoat: 0.6,
+    clearcoatRoughness: 0.3,
+    ior: 1.45,
+    transparent: true,
+    opacity: disc ? 0.24 : cartilage ? 0.2 : 0.3,
+    depthWrite: false,
+    emissive: new THREE.Color('#151207'),
+    emissiveIntensity: 0.25
   })
 }
 
@@ -69,12 +69,12 @@ function getCartGeometry(bone) {
 const _clavGeoCache = new WeakMap()
 
 // ── Component ─────────────────────────────────────────────────────────────────
-export default function ThoraxFramework({ visible = true }) {
-  const bones    = useMemo(buildThorax, [])
-  const ribs     = useMemo(() => bones.filter(b => b.kind === 'rib'),      [bones])
-  const sterna   = useMemo(() => bones.filter(b => b.kind === 'sternum'),  [bones])
-  const vertebrae= useMemo(() => bones.filter(b => b.kind === 'vertebra'), [bones])
-  const clavs    = useMemo(() => bones.filter(b => b.kind === 'clavicle'), [bones])
+export default function ThoraxFramework({ visible = true, interactive = false }) {
+  const bones = useMemo(buildThorax, [])
+  const ribs = useMemo(() => bones.filter(b => b.kind === 'rib'), [bones])
+  const sterna = useMemo(() => bones.filter(b => b.kind === 'sternum'), [bones])
+  const vertebrae = useMemo(() => bones.filter(b => b.kind === 'vertebra'), [bones])
+  const clavs = useMemo(() => bones.filter(b => b.kind === 'clavicle'), [bones])
 
   const [hover, setHover] = useState(null)
   const groupRef = useRef()
@@ -84,58 +84,72 @@ export default function ThoraxFramework({ visible = true }) {
     const m = new Map()
     bones.forEach(b => m.set(b.id, makeBoneMaterial('bone')))
     const cart = new Map()
-    ribs.forEach(b => { if (b.cartilagePts) cart.set(b.id, makeBoneMaterial('cartilage')) })
+    ribs.forEach(b => {
+      if (b.cartilagePts) cart.set(b.id, makeBoneMaterial('cartilage'))
+    })
     return { bone: m, cart }
   }, [bones, ribs])
 
-  useEffect(() => () => {
-    matMap.bone.forEach(m => m.dispose())
-    matMap.cart.forEach(m => m.dispose())
-  }, [matMap])
+  useEffect(
+    () => () => {
+      matMap.bone.forEach(m => m.dispose())
+      matMap.cart.forEach(m => m.dispose())
+    },
+    [matMap]
+  )
 
   const HOVER_EMISSIVE = useMemo(() => new THREE.Color('#cfe6ff'), [])
-  const BASE_EMISSIVE  = useMemo(() => new THREE.Color('#151207'), [])
+  const BASE_EMISSIVE = useMemo(() => new THREE.Color('#151207'), [])
 
   // Per-frame glow easing toward the hovered bone + gentle respiratory drift
   useFrame(state => {
     const t = state.clock.elapsedTime
     if (groupRef.current) {
-      const breathe = 1 + 0.006 * Math.sin(t * 2 * Math.PI * 0.23)   // ~14 breaths/min
+      const breathe = 1 + 0.006 * Math.sin(t * 2 * Math.PI * 0.23) // ~14 breaths/min
       groupRef.current.scale.setScalar(breathe)
     }
     matMap.bone.forEach((m, id) => {
-      const active = hover && (hover.id === id)
+      const active = hover && hover.id === id
       m.emissive.lerp(active ? HOVER_EMISSIVE : BASE_EMISSIVE, 0.15)
       const target = active ? 0.8 : 0.25
       m.emissiveIntensity += (target - m.emissiveIntensity) * 0.15
     })
   })
 
-  // Pointer plumbing for every bone mesh
-  const handlersFor = marker => ({
-    onPointerOver: e => {
-      e.stopPropagation()
-      setHover(marker)
-      document.body.style.cursor = 'pointer'
-    },
-    onPointerOut: () => {
-      setHover(h => (h && h.id === marker.id ? null : h))
+  // Pointer plumbing for every bone mesh — attached only when labels are on,
+  // so the default view stays a bare, uninterruptible model surface.
+  const handlersFor = marker =>
+    interactive
+      ? {
+          onPointerOver: e => {
+            e.stopPropagation()
+            setHover(marker)
+            document.body.style.cursor = 'pointer'
+          },
+          onPointerOut: () => {
+            setHover(h => (h && h.id === marker.id ? null : h))
+            document.body.style.cursor = 'auto'
+          },
+          onPointerDown: e => {
+            e.stopPropagation()
+            window.dispatchEvent(new CustomEvent('ct:focus-marker', { detail: marker.id }))
+          }
+        }
+      : {}
+
+  useEffect(
+    () => () => {
       document.body.style.cursor = 'auto'
     },
-    onPointerDown: e => {
-      e.stopPropagation()
-      window.dispatchEvent(new CustomEvent('ct:focus-marker', { detail: marker.id }))
-    },
-  })
-
-  useEffect(() => () => { document.body.style.cursor = 'auto' }, [])
+    []
+  )
 
   return (
     <group ref={groupRef} visible={visible}>
       {/* ── Ribs (+ translucent costal cartilage for true ribs) ── */}
       {ribs.map(b => (
         <group key={b.id} {...handlersFor(b.marker)}>
-          <mesh geometry={getRibGeometry(b)}  material={matMap.bone.get(b.id)} />
+          <mesh geometry={getRibGeometry(b)} material={matMap.bone.get(b.id)} />
           {b.cartilagePts && getCartGeometry(b) && (
             <mesh geometry={getCartGeometry(b)} material={matMap.cart.get(b.id)} />
           )}
@@ -162,7 +176,7 @@ export default function ThoraxFramework({ visible = true }) {
             <cylinderGeometry args={[0.085, 0.085, 0.17, 10]} />
           </mesh>
           <mesh
-            position={[VB.pos[0], VB.pos[1], VB.pos[2] - 0.20]}
+            position={[VB.pos[0], VB.pos[1], VB.pos[2] - 0.2]}
             rotation={[Math.PI / 2, 0, 0]}
             material={matMap.bone.get(VB.id)}
           >
@@ -170,7 +184,13 @@ export default function ThoraxFramework({ visible = true }) {
           </mesh>
           <mesh position={[0, VB.discY, VB.pos[2]]}>
             <cylinderGeometry args={[0.07, 0.07, 0.045, 10]} />
-            <meshStandardMaterial color="#5a5f74" roughness={0.7} transparent opacity={0.35} depthWrite={false} />
+            <meshStandardMaterial
+              color="#5a5f74"
+              roughness={0.7}
+              transparent
+              opacity={0.35}
+              depthWrite={false}
+            />
           </mesh>
         </group>
       ))}
@@ -183,12 +203,17 @@ export default function ThoraxFramework({ visible = true }) {
           _clavGeoCache.set(C.curve, g)
         }
         return (
-          <mesh key={C.id} geometry={g} material={matMap.bone.get(C.id)} {...handlersFor(C.marker)} />
+          <mesh
+            key={C.id}
+            geometry={g}
+            material={matMap.bone.get(C.id)}
+            {...handlersFor(C.marker)}
+          />
         )
       })}
 
-      {/* Single shared anatomical badge for whichever bone is hovered */}
-      {hover && (
+      {/* Single shared anatomical badge — only while labels are enabled */}
+      {interactive && hover && (
         <Html
           position={[hover.pos.x, hover.pos.y + 0.1, hover.pos.z]}
           center

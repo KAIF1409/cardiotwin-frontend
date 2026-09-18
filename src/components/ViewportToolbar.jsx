@@ -1,30 +1,95 @@
 /**
  * ViewportToolbar.jsx — floating minimal glass toolbar on the 3D stage
- * ─────────────────────────────────────────────────────────────────────
- * Zoom ± · Reset camera · Slicing plane toggle · Strain heatmap toggle ·
- * Blood-flow particles toggle · Anatomical focus chips (LV RV LA RA AO).
- * All actions are imperative (camera refs / engine flags) — no re-render
- * of the Canvas tree.
+ *
+ * Icons from lucide-react — open source (ISC license).
  */
 
+import { useEffect, useRef, useState } from 'react'
+import {
+  ZoomIn,
+  ZoomOut,
+  RotateCcw,
+  Scissors,
+  ThermometerSun,
+  Droplets,
+  Eye,
+  Speaker,
+  Monitor,
+  Tag,
+  Layers,
+  Target,
+  HeartPulse,
+  Wind,
+  Activity,
+  Crosshair
+} from 'lucide-react'
+
+const LAYER_ITEMS = [
+  { key: 'skeleton', label: 'Skeleton', Icon: Layers },
+  { key: 'pericardium', label: 'Pericardium', Icon: Layers },
+  { key: 'myocardium', label: 'Myocardium', Icon: HeartPulse },
+  { key: 'chambers', label: 'Chambers', Icon: Eye },
+  { key: 'valves', label: 'Valves', Icon: Wind },
+  { key: 'arteries', label: 'Arteries', Icon: Activity },
+  { key: 'veins', label: 'Veins', Icon: Droplets },
+  { key: 'conduction', label: 'Conduction', Icon: Layers }
+]
+
 export default function ViewportToolbar({
-  onZoomIn, onZoomOut, onResetView,
-  sliceActive, onToggleSlice,
-  strainActive, onToggleStrain,
-  flowOn, onToggleFlow,
-  thoraxOn, onToggleThorax,
-  focusTargets, onFocus, activeFocus,
+  onZoomIn,
+  onZoomOut,
+  onResetView,
+  sliceActive,
+  onToggleSlice,
+  strainActive,
+  onToggleStrain,
+  flowOn,
+  onToggleFlow,
+  thoraxOn,
+  onToggleThorax,
+  labelsOn = false,
+  onToggleLabels,
+  soundOn = false,
+  onToggleSound,
+  hudOn = false,
+  onToggleHud,
+  layers = {},
+  onSetLayer,
+  focusTargets,
+  onFocus,
+  activeFocus,
+  anatomyOn = false,
+  onAnatomy,
+  anatomyLabel,
+  focusActive = false,
+  onToggleFocus
 }) {
+  const [layersOpen, setLayersOpen] = useState(false)
+  const [focusOpen, setFocusOpen] = useState(false) // collapsed by default — never blocks the heart
+  const popRef = useRef(null)
+  const focusRef = useRef(null)
+
+  useEffect(() => {
+    if (!layersOpen && !focusOpen) return
+    const onDown = e => {
+      if (layersOpen && popRef.current && !popRef.current.contains(e.target)) setLayersOpen(false)
+      if (focusOpen && focusRef.current && !focusRef.current.contains(e.target)) setFocusOpen(false)
+    }
+    window.addEventListener('pointerdown', onDown)
+    return () => window.removeEventListener('pointerdown', onDown)
+  }, [layersOpen, focusOpen])
+
   return (
-    <div className="viewport-toolbar">
+    <div className="viewport-toolbar" role="toolbar" aria-label="Viewport controls">
       <div className="vt-group" role="group" aria-label="Camera controls">
-        <button className="vt-btn" onClick={onZoomIn}  title="Zoom in"><span>＋</span></button>
-        <button className="vt-btn" onClick={onZoomOut} title="Zoom out"><span>－</span></button>
+        <button className="vt-btn" onClick={onZoomIn} title="Zoom in">
+          <ZoomIn size={16} strokeWidth={1.5} />
+        </button>
+        <button className="vt-btn" onClick={onZoomOut} title="Zoom out">
+          <ZoomOut size={16} strokeWidth={1.5} />
+        </button>
         <button className="vt-btn" onClick={onResetView} title="Reset camera">
-          <svg width="13" height="13" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.4">
-            <path d="M3 12a9 9 0 1 0 3-6.7" strokeLinecap="round"/>
-            <path d="M3 4v5h5" strokeLinecap="round" strokeLinejoin="round"/>
-          </svg>
+          <RotateCcw size={16} strokeWidth={1.5} />
         </button>
       </div>
 
@@ -35,59 +100,165 @@ export default function ViewportToolbar({
           className={`vt-btn ${sliceActive ? 'active' : ''}`}
           onClick={onToggleSlice}
           title="Slicing plane (coronary cut)"
+          aria-pressed={sliceActive}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M3 15l9 6 9-6M3 9l9 6 9-6-9-6-9 6z" strokeLinejoin="round"/>
-          </svg>
+          <Scissors size={16} strokeWidth={1.5} />
         </button>
+
         <button
           className={`vt-btn ${strainActive ? 'active' : ''}`}
           onClick={onToggleStrain}
           title="Strain heatmap view"
+          aria-pressed={strainActive}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M12 3v18M5 8c2.5 0 4.5 1.8 4.5 4S7.5 16 5 16s-2-1.6-2-4 .5-4 2-4zm14 0c-2.5 0-4.5 1.8-4.5 4s2 4 4.5 4 2-1.6 2-4-.5-4-2-4z" strokeLinejoin="round"/>
-          </svg>
+          <ThermometerSun size={16} strokeWidth={1.5} />
         </button>
+
         <button
-          className={`vt-btn ${flowOn ? 'flow-on' : ''} ${flowOn ? 'active' : ''}`}
+          className={`vt-btn flow ${flowOn ? 'on' : ''}`}
           onClick={onToggleFlow}
-          title="Blood flow particles"
+          title={flowOn ? 'Hide blood-flow vectors' : 'Show blood-flow vectors'}
+          aria-pressed={flowOn}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2.2">
-            <path d="M3 12h11M17 12l-3-3m3 3l-3 3" strokeLinecap="round" strokeLinejoin="round"/>
-            <circle cx="20.5" cy="12" r="1.4" fill="currentColor" stroke="none"/>
-          </svg>
+          <Wind size={16} strokeWidth={1.5} />
         </button>
+
         <button
           className={`vt-btn ${thoraxOn ? 'active' : ''}`}
           onClick={onToggleThorax}
           title="Thoracic skeleton frame"
+          aria-pressed={thoraxOn}
         >
-          <svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
-            <path d="M6 4c-2 2.5-2.5 7-1.5 11S8 21 9 19s0-5-.5-8S7 5 6 4z" strokeLinejoin="round"/>
-            <path d="M18 4c2 2.5 2.5 7 1.5 11S16 21 15 19s0-5 .5-8S17 5 18 4z" strokeLinejoin="round"/>
-            <path d="M10 5v13m4-13v13" strokeLinecap="round"/>
-          </svg>
+          <Layers size={16} strokeWidth={1.5} />
+        </button>
+
+        <button
+          className={`vt-btn vt-sound ${soundOn ? 'active sound-on' : ''}`}
+          onClick={onToggleSound}
+          title={
+            soundOn
+              ? 'Mute heart sounds'
+              : 'Listen to heart sounds (S1·S2 — murmurs when valves narrow)'
+          }
+          aria-pressed={soundOn}
+        >
+          <Speaker size={16} strokeWidth={1.5} />
+        </button>
+
+        <button
+          className={`vt-btn vt-hud ${hudOn ? 'active' : ''}`}
+          onClick={onToggleHud}
+          title={
+            hudOn
+              ? 'Exit Projector/HUD mode'
+              : 'Projector/HUD mode — full-screen classroom projection with 2× labels'
+          }
+          aria-pressed={hudOn}
+        >
+          <Monitor size={16} strokeWidth={1.5} />
+        </button>
+
+        <button
+          className={`vt-btn vt-labels ${labelsOn ? 'active' : ''}`}
+          onClick={onToggleLabels}
+          title={labelsOn ? 'Hide anatomical labels' : 'Show anatomical labels'}
+          aria-pressed={labelsOn}
+        >
+          <Tag size={16} strokeWidth={1.5} />
+        </button>
+
+        <button
+          className={`vt-btn ${anatomyOn ? 'active' : ''}`}
+          onClick={onAnatomy}
+          title={
+            anatomyOn
+              ? `Return to heart (viewing ${anatomyLabel})`
+              : 'Replace heart with selected anatomy'
+          }
+          aria-pressed={anatomyOn}
+        >
+          <Target size={16} strokeWidth={1.5} />
+          {anatomyOn && <span className="vt-btn-txt">{anatomyLabel}</span>}
+        </button>
+
+        <button
+          className={`vt-btn vt-focus ${focusActive ? 'active' : ''}`}
+          onClick={onToggleFocus}
+          title={
+            focusActive
+              ? 'Exit focus view (Esc) — panels return'
+              : 'Focus view — clears every panel for an unobstructed model'
+          }
+          aria-pressed={focusActive}
+        >
+          <Crosshair size={16} strokeWidth={1.5} />
         </button>
       </div>
 
       <div className="vt-divider" />
 
-      {/* Anatomical focus chips — click to glide camera */}
-      {focusTargets && (
-        <div className="vt-focus-row" role="group" aria-label="Focus anatomy">
-          {focusTargets.map(t => (
-            <button
-              key={t.id}
-              className={`vt-chip ${activeFocus === t.id ? 'active' : ''}`}
-              style={{ '--chip': t.color }}
-              onClick={() => onFocus(t)}
-              title={`${t.fullName} — ${t.desc}`}
-            >
-              {t.id}
-            </button>
-          ))}
+      <div className="vt-layers-wrap" ref={popRef}>
+        <button
+          className={`vt-btn ${layersOpen ? 'active' : ''}`}
+          onClick={() => setLayersOpen(o => !o)}
+          title="Anatomical layer isolation"
+          aria-expanded={layersOpen}
+        >
+          <Layers size={16} strokeWidth={1.5} />
+        </button>
+        {layersOpen && (
+          <div className="layers-pop glass-pop" role="menu" aria-label="Anatomical layers">
+            <div className="layers-pop-head">ANATOMICAL LAYERS</div>
+            {LAYER_ITEMS.map(item => (
+              <label key={item.key} className="layer-row" data-on={!!layers[item.key]}>
+                <input
+                  type="checkbox"
+                  checked={!!layers[item.key]}
+                  onChange={() => onSetLayer?.(item.key)}
+                />
+                <span className="layer-ico">
+                  <item.Icon size={14} strokeWidth={1.5} />
+                </span>
+                <span className="layer-name">{item.label}</span>
+                <span className="layer-tick">{layers[item.key] ? 'ON' : 'OFF'}</span>
+              </label>
+            ))}
+            <div className="layers-pop-foot">Inner chambers auto-clear the myocardial wall</div>
+          </div>
+        )}
+      </div>
+
+      {focusTargets && focusTargets.length > 0 && (
+        <div className="vt-focus-wrap" ref={focusRef}>
+          <button
+            className={`vt-btn ${focusOpen ? 'active' : ''}`}
+            onClick={() => setFocusOpen(o => !o)}
+            title="Focus anatomy — glide camera to a structure"
+            aria-expanded={focusOpen}
+          >
+            <Crosshair size={16} strokeWidth={1.5} />
+          </button>
+          {focusOpen && (
+            <div className="layers-pop glass-pop focus-pop" role="menu" aria-label="Focus anatomy">
+              <div className="layers-pop-head">FOCUS ANATOMY</div>
+              <div className="focus-grid">
+                {focusTargets.map(t => (
+                  <button
+                    key={t.id}
+                    className={`vt-chip ${activeFocus === t.id ? 'active' : ''}`}
+                    style={{ '--chip': t.color }}
+                    onClick={() => {
+                      onFocus(t)
+                      setFocusOpen(false)
+                    }}
+                    title={`${t.fullName} — ${t.desc}`}
+                  >
+                    {t.id}
+                  </button>
+                ))}
+              </div>
+            </div>
+          )}
         </div>
       )}
     </div>
